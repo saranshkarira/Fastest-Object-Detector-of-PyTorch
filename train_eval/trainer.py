@@ -11,10 +11,9 @@ import cfgs.config as cfg #make a common config file
 # # from datasets.pascal_voc import VOCDataset
 # # import utils.yolo as yolo_utils
 # # import utils.network as net_utils
-# # from utils.timer import Timer
+from utils.timer import Timer
 
-# import cfgs.config as cfg
-# from random import randint
+from random import randint
 
 # try:
 #     from pycrayon import CrayonClient
