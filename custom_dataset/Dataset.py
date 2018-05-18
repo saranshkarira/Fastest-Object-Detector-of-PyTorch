@@ -14,21 +14,21 @@ class MODClass(data.Dataset):
 				self.length = txn.stat()['entries']
 				self.data = iter(cursor) #takes all the db into ram at once at superspeed, if db bigger than ram than add cursor slicing
 			
-			def __getitem__(self, index):
-			img,target = None, None
-			
-			img_buf = self.data[index]#accessing key
-			buf = six.BytesIO()
-			buf.write(img_buf)
-			buf.seek(0)
-			img = Image.open(buf).convert('RGB')
+		def __getitem__(self, index):
+		img,target = None, None
+		
+		img_buf = self.data[index]#accessing key
+		buf = six.BytesIO()
+		buf.write(img_buf)
+		buf.seek(0)
+		img = Image.open(buf).convert('RGB')
 
-			if self.transform is not None:
-				img = self.transform(img)
+		if self.transform is not None:
+			img = self.transform(img)
 
-			#define target
-			if self.target_transform is not None:
-				target = self.target_transform(target)
+		#define target
+		if self.target_transform is not None:
+			target = self.target_transform(target)
 
 
 			return img, target
@@ -54,6 +54,8 @@ class MOD(data.Dataset):  #Miliatry Object Detection Dataset
 		self.db_path = os.path.expanduser(db_path)
 		self.transform = transform
 		self.target_transform = target_transform
+
+		
 
 		
 
