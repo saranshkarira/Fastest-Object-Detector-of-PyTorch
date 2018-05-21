@@ -96,9 +96,10 @@ if __name__ == '__main__':
 
     
     net = Darknet(args.cfgfile)
+    with open(args.cfgfile, r) as config:
+        cfg = config
 
-
-
+    
 
     #load from a checkpoint
 
@@ -109,8 +110,8 @@ if __name__ == '__main__':
 
     #Optimizer
     start_epoch = 0
-    lr = cfg.init_learning_rate
-    Optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
+    lr = cfg.learning_rate
+    Optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.decay)
 
     #tensorboard
     if args.use_tensorboard and SummaryWriter is not None:
