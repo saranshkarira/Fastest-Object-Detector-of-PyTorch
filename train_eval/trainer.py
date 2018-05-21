@@ -6,19 +6,23 @@ import cfgs.config as cfg #make a common config file
 
 # import datetime
 
-# from darknet import Darknet
-
-# # from datasets.pascal_voc import VOCDataset
-# # import utils.yolo as yolo_utils
-# # import utils.network as net_utils
-from utils.timer import Timer
-
-from random import randint
-
 # try:
 #     from pycrayon import CrayonClient
 # except ImportError:
 #     CrayonClient = None
+
+# # from datasets.pascal_voc import VOCDataset
+# # import utils.yolo as yolo_utils
+# # import utils.network as net_utils
+
+from darknet import Darknet
+
+
+from utils.timer import Timer
+
+from random import randint
+
+
 
 import torchvision
 import argparse
@@ -27,6 +31,17 @@ try:
     from tensorboardX import SummaryWriter
 except ImportError:
     SummaryWriter = None
+
+from custom_dataset.bbdset import dataset as lmdb
+
+
+
+
+##########FUNCTIONS#################
+#Pending
+##Loading from a checkpoint 
+##parsing the target dictionaries
+
 
 def arg_parse():
     """
@@ -73,6 +88,10 @@ if __name__ == '__main__':
 
     else :
         #custom dataset pipeline with LMDB
+        dataset = lmdb(target_file, root_dir, transforms)
+        data_loader = torch.utils.data.DataLoader(image_data, batch_size = args.batch, shuffle=True, num_workers = args.workers)
+        #currently contains dict with keys : 'image' and 'targets'
+
 
 
     
@@ -110,11 +129,11 @@ if __name__ == '__main__':
 
         #batch
         batch = dataloader.next_batch(size_index)
-        im = batch['images']
+        im = batch['image']
         gt_boxes = batch['gt_classes']
         gt_classes = batch['gt_classes']
-        dontcare = batch['dontcare']
-        origin_im = batch['origin_im']
+        # dontcare = batch['dontcare']
+        # origin_im = batch['origin_im']
 
         #forward
         im_data = net_utils.np_to_variable(im, is_cuda = True, volatile=False).permute(0,3,1,2)
