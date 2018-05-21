@@ -57,20 +57,20 @@ def __getitem__(self, idx):
     gt_boxes = []
     gt_classes = []
 
-    keys = self.targets[idx].keys()
+    # keys = self.targets[idx].keys()
 
-    for key in keys:
-        if len(self.targets[idx][key]) == 0:
+    for k, v in self.targets[idx]:
+        if len(v) == 0:
             continue
 
-        elif len(self.targets[idx][key][0]) == 1:
-            gt_boxes.append(self.targets[idx][key])
-            gt_classes.append(self.class_map[key])
+        elif len(v[0]) == 1:
+            gt_boxes.append(v)
+            gt_classes.append(k)
 
         else :
-            for anns in self.targets[idx][key]:
+            for anns in v:
                 gt_boxes.append(anns)
-                gt_classes.append(key)
+                gt_classes.append(k)
 
 
 	# targets = self.target_file.iloc[idx,1:].as_matrix()

@@ -201,7 +201,7 @@ if __name__ == '__main__':
                 optimizer = torch.optime.SGD(net.parameters(), lr =lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
 
 
-           save_name = os.path.join(cfg.train_output_dir,
+            save_name = os.path.join(cfg.train_output_dir,
                                      '{}_{}.h5'.format(cfg.exp_name, imdb.epoch))
             net_utils.save_net(save_name, net)
             print(('save model: {}'.format(save_name)))
