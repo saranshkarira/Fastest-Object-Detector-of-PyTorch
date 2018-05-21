@@ -8,23 +8,30 @@ import numpy as np
 import six
 from PIL import Image
 from skimage import transform
+import json
+# import pprint
+
 #Dataclass
 class dataset(data.Dataset):
-	def __init__(self, csv_file, root_dir, transforms=None):
+	def __init__(self, target_file, root_dir, transforms=None):
         """
         Args:
-            csv_file (string): Path to the csv file with annotations.
+            target_file (string): Path to the target file with annotations.
             root_dir (string): Directory with all the images.
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
 
-        self.target_file = pd.read_csv(csv_file) #Add hdf5 as default in future
+        # self.target_file = pd.read_csv(csv_file)
         self.root_dir = root_dir
         self.transform = transform
         self.env = lmdb.open(root_dir, max_readers=5, readonly=True, lock=False, readahead=False, meminit=False)
         self.txn = self.env.begin(write=False)
 
+        self.class_map = {'weapon' : 0, 'vehicle':1, 'building': 2, 'person': 3}
+
+        with open(target_file) as opener:
+            self.targets = json.load(opener)
 
 ##len
 def __len__(self):
@@ -43,10 +50,33 @@ def __getitem__(self, idx):
 	buf.seek(0)
 	image = Image.open(buf).Convert('RGB')
 
-	targets = self.target_file.iloc[idx,1:].as_matrix()
-	targets = targets.astype('float').reshape()## add the reshape dims
+    ##getting is a very often command so not making a function to prevent redirection overhead
+
+    ## Targets
+
+    gt_boxes = []
+    gt_classes = []
+
+    keys = self.targets[idx].keys()
+
+    for key in keys:
+        if len(self.targets[idx][key]) == 0:
+            continue
+
+        elif len(self.targets[idx][key][0]) == 1:
+            gt_boxes.append(self.targets[idx][key])
+            gt_classes.append(self.class_map[key])
+
+        else :
+            for anns in self.targets[idx][key]:
+                gt_boxes.append(anns)
+                gt_classes.append(key)
+
+
+	# targets = self.target_file.iloc[idx,1:].as_matrix()
+	gt_boxes = gt_boxes.astype('float').reshape(:,2)## add the reshape dims
 	
-	sample = {'image': image, 'targets': targets}
+	sample = {'image': image, 'gt_classes': gt_classes, 'gt_boxes':gt_boxes}
 
 	if self.transform:
 		sample = self.transform(sample)
@@ -68,7 +98,7 @@ class Rescale(object):
 		assert isinstance(output_size, (int, tuple))
 		self.output_size = output_size
 	def __call__(self, sample):
-		image, targets = sample['image'], sample['targets']
+		image, gt_boxes = sample['image'], sample['gt_boxes']
 		h,w = image.shape[:2]
 		if isinstance(self.output_size, int):
 			if h>w:
@@ -85,9 +115,9 @@ class Rescale(object):
 		img = transform.resize(image, (new_h, new_w))
         # h and w are swapped for landmarks because for images,
         # x and y axes are axis 1 and 0 respectively
-        targets = targets*[new_w/w, new_h/h]
+        gt_boxes = gt_boxes*[new_w/w, new_h/h]
 
-        return {'image': img, 'targets': targets}
+        return {'image': img, 'gt_boxes': gt_boxes}
 
 #RandomCrop
 class RandomCrop(object):
@@ -107,7 +137,7 @@ class RandomCrop(object):
     		self.output_size = output_size
 
     def __call__(self, sample):
-    	image, targets = sample['image'], sample['targets']
+    	image, gt_boxes = sample['image'], sample['gt_boxes']
 
     	h, w = image.shape[:2]
     	new_h, new_w = self.output_size
@@ -117,21 +147,21 @@ class RandomCrop(object):
 
     	image = image[top: top+new_h, left: left+new_w]
 
-    	targets = targets - [left, top]
+    	gt_boxes = gt_boxes - [left, top]
 
-    	return {'image':image, 'targets':targets}
+    	return {'image':image, 'gt_boxes':gt_boxes}
 
 #ToTensor
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
     def __call__(self, sample):
-        image, targets = sample['image'], sample['targets']
+        image, gt_boxes = sample['image'], sample['gt_boxes']
 
         # swap color axis because
         # numpy image: H x W x C
         # torch image: C X H X W
         image = image.transpose((2, 0, 1))
         return {'image': torch.from_numpy(image),
-                'targets': torch.from_numpy(targets)}
+                'gt_boxes': torch.from_numpy(gt_boxes)}
 
