@@ -14,6 +14,7 @@ import cfgs.config as cfg #make a common config file
 # # from datasets.pascal_voc import VOCDataset
 # # import utils.yolo as yolo_utils
 # # import utils.network as net_utils
+<<<<<<< HEAD
 
 from darknet import Darknet
 
@@ -22,6 +23,11 @@ from utils.timer import Timer
 
 from random import randint
 
+=======
+from utils.timer import Timer
+
+from random import randint
+>>>>>>> acfa21f619d915859da073c5a5b71ffb90a90b72
 
 
 import torchvision
