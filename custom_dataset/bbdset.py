@@ -1,11 +1,13 @@
-##DataSet Barebones
-## targets are treated as a [-1,2] matrix of points of polygon with 2 coordinates
+##DataSet Barebone
+#sT# targets are treated as a [-1,2] matrix of points of polygon with 2 coordinates
 #Imports
 import torch.utils.data as data
 import pandas as pd #what about hdf5
 import os
-
-
+import numpy as np
+import six
+from PIL import Image
+from skimage import transform
 #Dataclass
 class dataset(data.Dataset):
 	def __init__(self, csv_file, root_dir, transforms=None):
@@ -20,16 +22,30 @@ class dataset(data.Dataset):
         self.target_file = pd.read_csv(csv_file) #Add hdf5 as default in future
         self.root_dir = root_dir
         self.transform = transform
+        self.env = lmdb.open(root_dir, max_readers=5, readonly=True, lock=False, readahead=False, meminit=False)
+        self.txn = self.env.begin(write=False)
+
 
 ##len
 def __len__(self):
-	return len(self.targets)
+    with txn.cursor() as cursor:
+       	length = txn.stat()['entries']
+	return length
 ##getitem
 def __getitem__(self, idx):
-	img_name = os.path.join(self.root_dir, self.target_file.iloc[idx,0])
-	image = io.imread(img_name)
+	# img_name = os.path.join(self.root_dir, self.target_file.iloc[idx,0])
+	# image = io.imread(img_name)
+
+	with txn.cursor() as cursor:
+		self.data = cursor[idx] #rebuild dataloader library to load more than single index a time
+	buf = six.BytesIO()
+	buf.write(img_buf)
+	buf.seek(0)
+	image = Image.open(buf).Convert('RGB')
+
 	targets = self.target_file.iloc[idx,1:].as_matrix()
 	targets = targets.astype('float').reshape()## add the reshape dims
+	
 	sample = {'image': image, 'targets': targets}
 
 	if self.transform:
@@ -103,7 +119,7 @@ class RandomCrop(object):
 
     	targets = targets - [left, top]
 
-    	return {'image':image, 'landmarks':landmarks}
+    	return {'image':image, 'targets':targets}
 
 #ToTensor
 class ToTensor(object):
