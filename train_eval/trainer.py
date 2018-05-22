@@ -91,7 +91,7 @@ if __name__ == '__main__':
     #     cfg = config
 
     # load from a checkpoint
-
+    net.load_from_npz(cfg.pretrained_model, num_conv=18)  # doubts
     net.cuda()
     net.train()
 
@@ -99,7 +99,7 @@ if __name__ == '__main__':
 
     # Optimizer
     start_epoch = 0
-    lr = cfg.learning_rate
+    lr = cfg.init_learning_rate
     optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.decay)
 
     # tensorboard

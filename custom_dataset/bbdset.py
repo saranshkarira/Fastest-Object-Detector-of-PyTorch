@@ -11,6 +11,7 @@ from PIL import Image
 from skimage import transform
 import json
 import lmdb
+import pickle
 # import pprint
 
 # Dataclass
@@ -31,6 +32,10 @@ class dataset(data.Dataset):
         self.transform = transform
         self.env = lmdb.open(root_dir, max_readers=5, readonly=True, lock=False, readahead=False, meminit=False)
         self.txn = self.env.begin(write=False)
+        with self.txn.cursor() as cursor:
+            self.length = self.txn.stat()['entries']
+            mapping = cursor.get('mapping')
+            self.mapping = pickle.loads(mapping.decode('base64', 'strict'))
 
         self.class_map = {'weapon': 0, 'vehicle': 1, 'building': 2, 'person': 3}
 
@@ -41,9 +46,8 @@ class dataset(data.Dataset):
 
 
 def __len__(self):
-    # with self.txn.cursor() as cursor:
-    # length = txn.stat()['entries']1
-    return self.txn.stat()['entries']
+
+    return self.length
 # getitem
 
 
@@ -51,8 +55,10 @@ def __getitem__(self, idx):
     # img_name = os.path.join(self.root_dir, self.target_file.iloc[idx,0])
     # image = io.imread(img_name)
 
+    # key = 'image' + str(idx)
+    image_id = self.mapping[idx]
     with self.txn.cursor() as cursor:
-        data = cursor[idx]  # rebuild dataloader library to load more than single index a time
+        data = cursor[image_id]  # rebuild dataloader library to load more than single index a time
     buf = six.BytesIO()
     buf.write(data)
     buf.seek(0)
