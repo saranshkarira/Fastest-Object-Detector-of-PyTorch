@@ -3,6 +3,7 @@
 import torch
 
 import cfgs.config as cfg  # make a common config file
+import os
 
 # import datetime
 
@@ -12,10 +13,11 @@ import cfgs.config as cfg  # make a common config file
 #     CrayonClient = None
 
 # # from datasets.pascal_voc import VOCDataset
-# # import utils.yolo as yolo_utils
-# # import utils.network as net_utils
 
+import utils.yolo as yolo_utils
+import utils.network as net_utils  # THEY HAVE ALTERNATES
 
+import datetime
 from darknet import Darknet
 from utils.timer import Timer
 from random import randint
@@ -80,13 +82,13 @@ if __name__ == '__main__':
 
     else:
         # custom dataset pipeline with LMDB
-        dataset = lmdb(target_file, root_dir, transforms)
-        data_loader = torch.utils.data.DataLoader(image_data, batch_size=args.batch, shuffle=True, num_workers=args.workers)
+        dataset = lmdb(cfg.target_file, cfg.root_dir, cfg.transforms)
+        dataloader = torch.utils.data.DataLoader(image_data, batch_size=args.batch, shuffle=True, num_workers=args.workers)
         # currently contains dict with keys : 'image' and 'targets'
 
     net = Darknet(args.cfgfile)
-    with open(args.cfgfile, r) as config:
-        cfg = config
+    # with open(args.cfgfile, 'r') as config:
+    #     cfg = config
 
     # load from a checkpoint
 
@@ -98,7 +100,7 @@ if __name__ == '__main__':
     # Optimizer
     start_epoch = 0
     lr = cfg.learning_rate
-    Optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.decay)
+    optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.decay)
 
     # tensorboard
     if args.use_tensorboard and SummaryWriter is not None:
@@ -110,6 +112,7 @@ if __name__ == '__main__':
     train_loss = 0
     bbox_loss, iou_loss, cls_loss = 0., 0., 0.
     cnt = 0
+    step_cnt = 0
     size_index = 0
     t = Timer()
     for step in range(start_epoch * dataloader.batch_per_epoch, cfg.max_epoch * dataloader.batch_per_epoch):
@@ -125,7 +128,7 @@ if __name__ == '__main__':
 
         # forward
         im_data = net_utils.np_to_variable(im, is_cuda=True, volatile=False).permute(0, 3, 1, 2)
-        bbox_pred, iou_pred, prob_pred = net(im_data, gt_boxes, gt_classes, dontcare, size_index)
+        bbox_pred, iou_pred, prob_pred = net(im_data, gt_boxes, gt_classes, size_index)
 
         # backward
         loss = net.loss
@@ -149,7 +152,7 @@ if __name__ == '__main__':
 
             print(('epoch %d[%d/%d], loss: %.3f, bbox_loss: %.3f, iou_loss: %.3f, '
                    'cls_loss: %.3f (%.2f s/batch, rest:%s)' %
-                   (imdb.epoch, step_cnt, batch_per_epoch, train_loss, bbox_loss,
+                   (dataloader.epoch, step_cnt, batch_per_epoch, train_loss, bbox_loss,
                     iou_loss, cls_loss, duration,
                     str(datetime.timedelta(seconds=int((batch_per_epoch - step_cnt) * duration))))))
 
@@ -182,12 +185,12 @@ if __name__ == '__main__':
             print("image_size {}".format(cfg.multi_scale_inp_size[size_index]))
 
         if step > 0 and (step % dataloader.batch_per_epoch == 0):
-            if imdb.epoch in cfg.lr_decay_epochs:
+            if dataloader.epoch in cfg.lr_decay_epochs:
                 lr *= cfg.lr_decay
                 optimizer = torch.optime.SGD(net.parameters(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
 
             save_name = os.path.join(cfg.train_output_dir,
-                                     '{}_{}.h5'.format(cfg.exp_name, imdb.epoch))
+                                     '{}_{}.h5'.format(cfg.exp_name, dataloader.epoch))
             net_utils.save_net(save_name, net)
             print(('save model: {}'.format(save_name)))
             step_cnt = 0
