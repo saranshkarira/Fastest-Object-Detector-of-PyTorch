@@ -14,7 +14,7 @@ import os
 
 # # from datasets.pascal_voc import VOCDataset
 
-import utils.yolo as yolo_utils
+# import utils.yolo as yolo_utils
 import utils.network as net_utils  # THEY HAVE ALTERNATES
 
 import datetime
@@ -48,15 +48,15 @@ def arg_parse():
 
     parser = argparse.ArgumentParser(description='Training module')
 
-    parser.add_argument("-i", dest='images', help="path to train image directory",
-                        default="imgs", type=str)
+    # parser.add_argument("-i", dest='images', help="path to train image directory",
+    #                     default="imgs", type=str)
     parser.add_argument("-w", dest='workers', help="number of workers to load the images",
                         default="4", type=int)
     parser.add_argument("-b", dest="batch", help="Batch size", default=50, type=int)
     # parser.add_argument("--confidence", dest = "confidence", help = "Object Confidence to filter predictions", default = 0.5)
     # parser.add_argument("--nms_thresh", dest = "nms_thresh", help = "NMS Threshhold", default = 0.4)
     parser.add_argument("-c", dest='cfgfile', help="Config file",
-                        default="cfg/yolov3.cfg", type=str)
+                        default="cfg/yolov2.cfg", type=str)
     parser.add_argument("-t", dest="use_tensorboard", help="Disable tensorboard", default=True, type=bool)
     # parser.add_argument("--weights", dest = 'weightsfile', help =
     #                     "weightsfile",
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     args = argparse()
 
     # Use LMDB or not
-    if args.lmdb == 0:
+    if cfg.lmdb == 0:
         image_data = torchvision.datasets.ImageFolder(args.path)
         data_loader = torch.utils.data.DataLoader(image_data, batch_size=args.batch, shuffle=True, num_workers=args.workers)
         # load the annotations
@@ -164,16 +164,16 @@ if __name__ == '__main__':
                 summary_writer.add_scalar('learning_rate', lr, step)
 
             # plot the results
-                bbox_pred = bbox_pred.data[0:1].cpu().numpy()
-                iou_pred = iou_pred.data[0:1].cpu().numpy()
-                prob_pred = prob_pred.data[0:1].cpu().numpy()
+                # bbox_pred = bbox_pred.data[0:1].cpu().numpy()
+                # iou_pred = iou_pred.data[0:1].cpu().numpy()
+                # prob_pred = prob_pred.data[0:1].cpu().numpy()
 
-                image = im[0]
+                # image = im[0]
 
-                bboxes, scores, cls_inds = yolo_utils.postprocess(
-                    bbox_pred, iou_pred, prob_pred, image.shape, cfg, thresh=0.3, size_index=size_index)
-                im2show = yolo_utils.draw_detection(image, bboxes, scores, cls_inds, cfg)
-                summary_writer.add_image('predict', im2show, step)
+                # bboxes, scores, cls_inds = yolo_utils.postprocess(
+                #     bbox_pred, iou_pred, prob_pred, image.shape, cfg, thresh=0.3, size_index=size_index)
+                # im2show = yolo_utils.draw_detection(image, bboxes, scores, cls_inds, cfg)
+                # summary_writer.add_image('predict', im2show, step)
 
             train_loss = 0
             bbox_loss, iou_loss, cls_loss = 0., 0., 0.
