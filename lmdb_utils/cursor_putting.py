@@ -20,7 +20,7 @@ def converter(output_path):
     env = lmdb.open(output_path, map_size=9959123412)
     batch = []
     counter = 0
-    joker = os.listdir('/home/trainee/FourClass_JPG/train/People_JPG')
+    joker = os.listdir('/home/akhilesh/Packages/Pytorch/data/FourClass_JPG/train/Weapon_JPG')
     joker.sort()
     dicto = {}
     # for i in range(len(joker)):
@@ -28,7 +28,7 @@ def converter(output_path):
     for image_name in joker:
         print(counter)
         # image_name = "image" + str(counter) + ".jpg"
-        image_path = "/home/trainee/Desktop/Battlezone/People_JPG/" + image_name
+        image_path = "/home/akhilesh/Packages/Pytorch/data/FourClass_JPG/train/Weapon_JPG/" + image_name
         if not os.path.isfile(image_path):
             print("{} is not a file".format(image_name))
             # counter += 1
@@ -60,7 +60,7 @@ def converter(output_path):
             print("flushing cache")
             batch = []
         counter += 1
-    dict_value = pickle.dumps(dicto).encode('base64', 'strict')
+    dict_value = pickle.dumps(dicto)  # .encode('base64', 'strict')
     # dict_value = str.encode(b64)
     dict_key = str.encode('mapping')
     batch.append((dict_key, dict_value))

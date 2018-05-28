@@ -1,0 +1,16 @@
+##28th May
+The adventures of self-proclaimed AI researcher
+
+# error in dimensions
+
+## as far as the outputs to the train.py and trainer.py are same, training is bound to occur
+
+This includes dimensions of
+
+## Image (does it need to be in PIL format)
+## Target (Nx1 integer)
+## Annotation (Nx4)
+
+
+
+## put this shit into git repo and then experiment
