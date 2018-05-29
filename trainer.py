@@ -32,7 +32,7 @@ except ImportError:
     SummaryWriter = None
 
 from bbdset import dataset as dset
-
+from torch.autograd import Variable
 
 # #########FUNCTIONS#################
 # Pending
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     # Use LMDB or not
     if lmdb == 0:
         image_data = torchvision.datasets.ImageFolder(args.path)
-        data_loader = torch.utils.data.DataLoader(image_data, batch_size=args.batch, shuffle=True, num_workers=args.workers)
+        data_loader = torch.utils.data.DataLoader(image_data, batch_size=args.batch, shuffle=True, num_workers=args.workers, multiscale=cfg.multi_scale_inp_size)
         # load the annotations
 
     else:
@@ -118,38 +118,41 @@ if __name__ == '__main__':
     t = Timer()
     for step in range(start_epoch * batch_per_epoch, cfg.max_epoch * batch_per_epoch):
         t.tic()
-        print(dataloader)
+        # batman = [v for k, v in enumerate(dataloader)]
+        print('I am the god', len(dataloader))
+
         # batch
-        # for batch_index, batch in enumerate(dataloader):
-        batch = iter(dataloader).next()
-        print('atleast here')
-        batch = batch[0]
-        im = batch['image']
-        gt_boxes = batch['gt_boxes']
-        gt_classes = batch['gt_classes']
+        for batch_index, batch in enumerate(dataloader):
+            # batch = iter(dataloader).next()
+            batch = batch[batch_index]
+            print('atleast here')
+            # batch = batch[0]
+            im = Variable(batch['image']).float()
+            gt_boxes = batch['gt_boxes']
+            gt_classes = batch['gt_classes']
+            dontcare = batch['dontcare']
+            # print(im, gt_boxes, gt_classes)
+            # dontcare = batch['dontcare']
+            # origin_im = batch['origin_im']
 
-        # print(im, gt_boxes, gt_classes)
-        # dontcare = batch['dontcare']
-        # origin_im = batch['origin_im']
+            # forward
+            print('here')
+            # im_data = net_utils.np_to_variable(im, is_cuda=True, volatile=False).permute(0, 3, 1, 2) #Already permuted
+            bbox_pred, iou_pred, prob_pred = net(im.cuda(), gt_boxes=gt_boxes, gt_classes=gt_classes, dontcare=dontcare, size_index=size_index)
 
-        # forward
-        print('here')
-        # im_data = net_utils.np_to_variable(im, is_cuda=True, volatile=False).permute(0, 3, 1, 2) #Already permuted
-        bbox_pred, iou_pred, prob_pred = net(im.cuda(), gt_boxes=gt_boxes, gt_classes=gt_classes, size_index=size_index)
+            # backward
+            loss = net.loss
+            bbox_loss += net.bbox_loss.data.cpu().numpy()[0]
+            iou_loss += net.iou_loss.data.cpu().numpy()[0]
+            cls_loss += net.cls_loss.data.cpu().numpy()[0]
 
-        # backward
-        loss = net.loss
-        bbox_loss += net.bbox_loss.data.cpu().numpy()[0]
-        iou_loss += net.iou_loss.data.cpu().numpy()[0]
-        cls_loss += net.cls_loss.data.cpu().numpy()[0]
-
-        train_loss += loss.data.cpu().numpy()[0]
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        cnt += 1
-        step_cnt += 1
-        duration = t.toc()
+            train_loss += loss.data.cpu().numpy()[0]
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            cnt += 1
+            step_cnt += 1
+            duration = t.toc()
 
         if step % cfg.disp_interval == 0:
             train_loss /= cnt
@@ -174,21 +177,6 @@ if __name__ == '__main__':
             bbox_loss, iou_loss, cls_loss = 0., 0., 0.
             cnt = 0
             t.clear()
-
-        # plot the results
-            # bbox_pred = bbox_pred.data[0:1].cpu().numpy()
-            # iou_pred = iou_pred.data[0:1].cpu().numpy()
-            # prob_pred = prob_pred.data[0:1].cpu().numpy()
-
-            # image = im[0]
-
-            # bboxes, scores, cls_inds = yolo_utils.postprocess(
-            #     bbox_pred, iou_pred, prob_pred, image.shape, cfg, thresh=0.3, size_index=size_index)
-            # im2show = yolo_utils.draw_detection(image, bboxes, scores, cls_inds, cfg)
-            # summary_writer.add_image('predict', im2show, step)
-
-            # size_index = randint(0, len(cfg.multiscale_inp_size) - 1)
-            # print("image_size {}".format(cfg.multi_scale_inp_size[size_index]))
 
         if step > 0 and (step % dataloader.batch_per_epoch == 0):
             if dataloader.epoch in cfg.lr_decay_epochs:

@@ -17,11 +17,10 @@ import pickle
 # import pprint
 # from PIL import Image
 # Dataclass
-tubelight = []
 
 
 class dataset(data.Dataset):
-    def __init__(self, target_file, root_dir, transforms=True):
+    def __init__(self, target_file, root_dir, multiscale, transforms=True):
         """
         Args:
             target_file (string): Path to the target file with annotations.
@@ -44,7 +43,8 @@ class dataset(data.Dataset):
 
         with open(target_file) as opener:
             self.targets = json.load(opener)
-
+        self.multiscale = multiscale
+        self.tubelight = []
 # len
 
     def __len__(self):
@@ -54,23 +54,14 @@ class dataset(data.Dataset):
 
     def __getitem__(self, idx):
 
-        # img_name = os.path.join(self.root_dir, self.target_file.iloc[idx,0])
-        # image = io.imread(img_name)
-
-        # key = 'image' + str(idx)
         print(idx)
         image_id = self.mapping[idx]
         with self.txn.cursor() as cursor:
             data = cursor.get(image_id)  # rebuild dataloader library to load more than single index a time
-        # buf = six.BytesIO()
-        # buf.write(data)
-        # buf.seek(0)
-        # print('size is ', len(data))
+
         img = cv2.imdecode(np.fromstring(data, dtype=np.uint8), 1)
         image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        # image = np.rollaxis(image, axis=2, start=0)
-        # image = Image.fromarray(image)
-        # print('size is', image.shape)
+
         # getting is a very often command so not making a function to prevent redirection overhead
 
         # Targets
@@ -93,24 +84,21 @@ class dataset(data.Dataset):
                     gt_boxes.append(anns)
                     gt_classes.append(self.class_map[k])
 
-        # targets = self.target_file.iloc[idx,1:].as_matrix()
-        # gt_boxes = gt_boxes.astype('float').reshape(-1, 2)  # add the reshape dims
+        sample = {'image': image, 'gt_classes': np.asarray(gt_classes), 'gt_boxes': np.asarray(gt_boxes).reshape(-1, 4), 'dontcare': self.multiscale}  # .reshape(-1, 2)}
 
-        sample = {'image': image, 'gt_classes': np.asarray(gt_classes), 'gt_boxes': np.asarray(gt_boxes).reshape(-1, 4)}  # .reshape(-1, 2)}
-        # print(sample['gt_boxes'])
         if self.transform or True:
-            # print('dog_2')
             rescale = Rescale(500)
-            sample = rescale(sample)
+            rescale(sample)
             random_crop = RandomCrop(416)
-            sample = random_crop(sample)
-            # to_tensor = ToTensor() ## takes numpy input
-            # sample = to_tensor(sample)
+            random_crop(sample)
+            print(sample['image'].shape)
+
         sample['image'] = np.rollaxis(sample['image'], axis=2, start=0)
+        # sample = [sample]
 
         # sample['image'] = Image.fromarray(sample['image'])
-        tubelight.append(sample)
-        return tubelight
+        self.tubelight.append(sample)
+        return self.tubelight
 
     # transforms
 
@@ -146,15 +134,11 @@ class Rescale(object):
             new_h, new_w = self.output_size
 
         new_h, new_w = int(new_h), int(new_w)
-        # print(new_h, new_w, h, w)
-        img = sktransform.resize(image, (new_h, new_w), mode='constant')
-        # print(new_h, new_w, img.shape)
-        # h and w are swapped for landmarks because for images,
-        # x and y axes are axis 1 and 0 respectively
-        # print('struck 1')
-        gt_boxes = gt_boxes * [new_w / w, new_h / h, new_w / w, new_h / h]
-        # print('struck 2')
-        return {'image': img, 'gt_boxes': gt_boxes, 'gt_classes': sample['gt_classes']}
+
+        sample['image'] = sktransform.resize(image, (new_h, new_w), mode='constant')
+
+        sample['gt_boxes'] = gt_boxes * [new_w / w, new_h / h, new_w / w, new_h / h]
+
 
 # RandomCrop
 
@@ -184,11 +168,9 @@ class RandomCrop(object):
         top = np.random.randint(0, h - new_h)
         left = np.random.randint(0, w - new_w)
 
-        image = image[top: top + new_h, left: left + new_w]
+        sample['image'] = image[top: top + new_h, left: left + new_w]
 
-        gt_boxes = gt_boxes - [left, top, left, top]
-
-        return {'image': image, 'gt_boxes': gt_boxes, 'gt_classes': sample['gt_classes']}
+        sample['gt_boxes'] = gt_boxes - [left, top, left, top]
 
 # ToTensor
 
