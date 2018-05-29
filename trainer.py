@@ -20,7 +20,7 @@ import utils.network as net_utils  # THEY HAVE ALTERNATES
 import datetime
 from darknet import Darknet19 as Darknet
 from utils.timer import Timer
-from random import randint
+# from random import randint
 
 
 import torchvision
@@ -52,7 +52,7 @@ def arg_parse():
                         default="imgs", type=str)
     parser.add_argument("-w", dest='workers', help="number of workers to load the images",
                         default="4", type=int)
-    parser.add_argument("-b", dest="batch", help="Batch size", default=50, type=int)
+    parser.add_argument("-b", dest="batch", help="Batch size", default=10, type=int)
     # parser.add_argument("--confidence", dest = "confidence", help = "Object Confidence to filter predictions", default = 0.5)
     # parser.add_argument("--nms_thresh", dest = "nms_thresh", help = "NMS Threshhold", default = 0.4)
     parser.add_argument("-c", dest='cfgfile', help="Config file",
@@ -116,36 +116,40 @@ if __name__ == '__main__':
     step_cnt = 0
     size_index = 0
     t = Timer()
-    for step in range(start_epoch, cfg.max_epoch):
+    for step in range(start_epoch * batch_per_epoch, cfg.max_epoch * batch_per_epoch):
         t.tic()
         print(dataloader)
         # batch
-        for batch_index, batch in enumerate(dataloader):
-            print('atleast here')
-            im = batch['image']
-            gt_boxes = batch['gt_boxes']
-            gt_classes = batch['gt_classes']
-            # dontcare = batch['dontcare']
-            # origin_im = batch['origin_im']
+        # for batch_index, batch in enumerate(dataloader):
+        batch = iter(dataloader).next()
+        print('atleast here')
+        batch = batch[0]
+        im = batch['image']
+        gt_boxes = batch['gt_boxes']
+        gt_classes = batch['gt_classes']
 
-            # forward
-            print('here')
-            im_data = net_utils.np_to_variable(im, is_cuda=True, volatile=False).permute(0, 3, 1, 2)
-            bbox_pred, iou_pred, prob_pred = net(im_data, gt_boxes, gt_classes, size_index)
+        # print(im, gt_boxes, gt_classes)
+        # dontcare = batch['dontcare']
+        # origin_im = batch['origin_im']
 
-            # backward
-            loss = net.loss
-            bbox_loss += net.bbox_loss.data.cpu().numpy()[0]
-            iou_loss += net.iou_loss.data.cpu().numpy()[0]
-            cls_loss += net.cls_loss.data.cpu().numpy()[0]
+        # forward
+        print('here')
+        # im_data = net_utils.np_to_variable(im, is_cuda=True, volatile=False).permute(0, 3, 1, 2) #Already permuted
+        bbox_pred, iou_pred, prob_pred = net(im.cuda(), gt_boxes=gt_boxes, gt_classes=gt_classes, size_index=size_index)
 
-            train_loss += loss.data.cpu().numpy()[0]
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            cnt += 1
-            step_cnt += 1
-            duration = t.toc()
+        # backward
+        loss = net.loss
+        bbox_loss += net.bbox_loss.data.cpu().numpy()[0]
+        iou_loss += net.iou_loss.data.cpu().numpy()[0]
+        cls_loss += net.cls_loss.data.cpu().numpy()[0]
+
+        train_loss += loss.data.cpu().numpy()[0]
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        cnt += 1
+        step_cnt += 1
+        duration = t.toc()
 
         if step % cfg.disp_interval == 0:
             train_loss /= cnt

@@ -15,8 +15,9 @@ import lmdb
 import pickle
 # import torchvision.transforms
 # import pprint
-
+# from PIL import Image
 # Dataclass
+tubelight = []
 
 
 class dataset(data.Dataset):
@@ -32,14 +33,14 @@ class dataset(data.Dataset):
         # self.target_file = pd.read_csv(csv_file)
         self.root_dir = root_dir
         self.transform = transforms
-        self.env = lmdb.open(root_dir, max_readers=5, readonly=True, lock=False, readahead=False, meminit=False)
+        self.env = lmdb.open(root_dir, max_readers=1, readonly=True, lock=False, readahead=False, meminit=False)
         self.txn = self.env.begin(write=False)
         with self.txn.cursor() as cursor:
             self.length = self.txn.stat()['entries'] - 1  # for mapping
             mapping = cursor.get('mapping')
             self.mapping = pickle.loads(mapping)  # mapping.decode('base64', 'strict'))
 
-        self.class_map = {'Weapon': [1, 0, 0, 0], 'Vehicle': [0, 1, 0, 0], 'Building': [0, 0, 1, 0], 'Person': [0, 0, 0, 1]}
+        self.class_map = {'Weapon': [0], 'Vehicle': [1], 'Building': [2], 'Person': [3]}
 
         with open(target_file) as opener:
             self.targets = json.load(opener)
@@ -52,6 +53,7 @@ class dataset(data.Dataset):
     # getitem
 
     def __getitem__(self, idx):
+
         # img_name = os.path.join(self.root_dir, self.target_file.iloc[idx,0])
         # image = io.imread(img_name)
 
@@ -63,9 +65,12 @@ class dataset(data.Dataset):
         # buf = six.BytesIO()
         # buf.write(data)
         # buf.seek(0)
+        # print('size is ', len(data))
         img = cv2.imdecode(np.fromstring(data, dtype=np.uint8), 1)
         image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
+        # image = np.rollaxis(image, axis=2, start=0)
+        # image = Image.fromarray(image)
+        # print('size is', image.shape)
         # getting is a very often command so not making a function to prevent redirection overhead
 
         # Targets
@@ -91,7 +96,7 @@ class dataset(data.Dataset):
         # targets = self.target_file.iloc[idx,1:].as_matrix()
         # gt_boxes = gt_boxes.astype('float').reshape(-1, 2)  # add the reshape dims
 
-        sample = {'image': image, 'gt_classes': np.asarray(gt_classes), 'gt_boxes': np.asarray(gt_boxes)[0].reshape(-1, 2)}
+        sample = {'image': image, 'gt_classes': np.asarray(gt_classes), 'gt_boxes': np.asarray(gt_boxes).reshape(-1, 4)}  # .reshape(-1, 2)}
         # print(sample['gt_boxes'])
         if self.transform or True:
             # print('dog_2')
@@ -101,9 +106,11 @@ class dataset(data.Dataset):
             sample = random_crop(sample)
             # to_tensor = ToTensor() ## takes numpy input
             # sample = to_tensor(sample)
+        sample['image'] = np.rollaxis(sample['image'], axis=2, start=0)
 
-        # print('here')
-        return sample
+        # sample['image'] = Image.fromarray(sample['image'])
+        tubelight.append(sample)
+        return tubelight
 
     # transforms
 
@@ -120,12 +127,14 @@ class Rescale(object):
     """
 
     def __init__(self, output_size):
+
         assert isinstance(output_size, (int, tuple))
         self.output_size = output_size
 
     def __call__(self, sample):
         image, gt_boxes = sample['image'], sample['gt_boxes']
         h, w = image.shape[:2]
+
         if isinstance(self.output_size, int):
             if h > w:
                 new_h, new_w = self.output_size * h / w, self.output_size
@@ -137,12 +146,14 @@ class Rescale(object):
             new_h, new_w = self.output_size
 
         new_h, new_w = int(new_h), int(new_w)
-
-        img = sktransform.resize(image, (new_h, new_w))
+        # print(new_h, new_w, h, w)
+        img = sktransform.resize(image, (new_h, new_w), mode='constant')
+        # print(new_h, new_w, img.shape)
         # h and w are swapped for landmarks because for images,
         # x and y axes are axis 1 and 0 respectively
-        gt_boxes = gt_boxes * [new_w / w, new_h / h]
-
+        # print('struck 1')
+        gt_boxes = gt_boxes * [new_w / w, new_h / h, new_w / w, new_h / h]
+        # print('struck 2')
         return {'image': img, 'gt_boxes': gt_boxes, 'gt_classes': sample['gt_classes']}
 
 # RandomCrop
@@ -169,13 +180,13 @@ class RandomCrop(object):
 
         h, w = image.shape[:2]
         new_h, new_w = self.output_size
-
+        # print(new_h, new_w, h, w)
         top = np.random.randint(0, h - new_h)
         left = np.random.randint(0, w - new_w)
 
         image = image[top: top + new_h, left: left + new_w]
 
-        gt_boxes = gt_boxes - [left, top]
+        gt_boxes = gt_boxes - [left, top, left, top]
 
         return {'image': image, 'gt_boxes': gt_boxes, 'gt_classes': sample['gt_classes']}
 
