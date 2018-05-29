@@ -20,7 +20,7 @@ import utils.network as net_utils  # THEY HAVE ALTERNATES
 import datetime
 from darknet import Darknet19 as Darknet
 from utils.timer import Timer
-# from random import randint
+from random import randint
 
 
 import torchvision
@@ -116,18 +116,19 @@ if __name__ == '__main__':
     step_cnt = 0
     size_index = 0
     t = Timer()
-    for step in range(start_epoch * batch_per_epoch, cfg.max_epoch * batch_per_epoch):
+    for step in range(start_epoch, cfg.max_epoch):
         t.tic()
         # batman = [v for k, v in enumerate(dataloader)]
-        print('I am the god', len(dataloader))
 
         # batch
         for batch_index, batch in enumerate(dataloader):
             # batch = iter(dataloader).next()
-            batch = batch[batch_index]
+            # batch = batch[batch_index]
             print('atleast here')
             # batch = batch[0]
-            im = Variable(batch['image']).float()
+            # print(batch['image'])
+            im = [Variable(i).float() for i in batch['image']]
+            print('pass')
             gt_boxes = batch['gt_boxes']
             gt_classes = batch['gt_classes']
             dontcare = batch['dontcare']
@@ -177,6 +178,7 @@ if __name__ == '__main__':
             bbox_loss, iou_loss, cls_loss = 0., 0., 0.
             cnt = 0
             t.clear()
+            size_index = randint(0, len(cfg.multi_scale_inp_size) - 1)
 
         if step > 0 and (step % dataloader.batch_per_epoch == 0):
             if dataloader.epoch in cfg.lr_decay_epochs:

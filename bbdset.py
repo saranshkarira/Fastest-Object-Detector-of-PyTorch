@@ -44,7 +44,7 @@ class dataset(data.Dataset):
         with open(target_file) as opener:
             self.targets = json.load(opener)
         self.multiscale = multiscale
-        self.tubelight = []
+        self.tubelight = {'image': [], 'gt_boxes': [], 'gt_classes': [], 'dontcare': []}
 # len
 
     def __len__(self):
@@ -97,7 +97,10 @@ class dataset(data.Dataset):
         # sample = [sample]
 
         # sample['image'] = Image.fromarray(sample['image'])
-        self.tubelight.append(sample)
+        self.tubelight['image'].append(sample['image'])
+        self.tubelight['gt_classes'].append(sample['gt_classes'])
+        self.tubelight['gt_boxes'].append(sample['gt_boxes'])
+        self.tubelight['dontcare'].append(sample['dontcare'])
         return self.tubelight
 
     # transforms
