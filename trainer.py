@@ -4,7 +4,7 @@ import torch
 
 import cfgs.config as cfg  # make a common config file
 import os
-
+# import numpy as np
 # import datetime
 
 # try:
@@ -32,12 +32,19 @@ except ImportError:
     SummaryWriter = None
 
 from bbdset import dataset as dset
-from torch.autograd import Variable
+# from torch.autograd import Variable
 
 # #########FUNCTIONS#################
 # Pending
 # Loading from a checkpoint
 # parsing the target dictionaries
+
+
+def torch_to_variable(x, is_cuda=True, dtype=torch.FloatTensor, volatile=False):
+    v = torch.autograd.Variable(x.type(dtype), volatile=volatile)
+    if is_cuda:
+        v = v.cuda()
+    return v
 
 
 def arg_parse():
@@ -52,7 +59,7 @@ def arg_parse():
                         default="imgs", type=str)
     parser.add_argument("-w", dest='workers', help="number of workers to load the images",
                         default="4", type=int)
-    parser.add_argument("-b", dest="batch", help="Batch size", default=10, type=int)
+    parser.add_argument("-b", dest="batch", help="Batch size", default=1, type=int)
     # parser.add_argument("--confidence", dest = "confidence", help = "Object Confidence to filter predictions", default = 0.5)
     # parser.add_argument("--nms_thresh", dest = "nms_thresh", help = "NMS Threshhold", default = 0.4)
     parser.add_argument("-c", dest='cfgfile', help="Config file",
@@ -82,7 +89,7 @@ if __name__ == '__main__':
 
     else:
         # custom dataset pipeline with LMDB
-        dataset = dset(cfg.target_file, cfg.root_dir, cfg.transforms)
+        dataset = dset(cfg.target_file, cfg.root_dir, cfg.multi_scale_inp_size, cfg.transforms)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch, shuffle=True, num_workers=args.workers)
         # currently contains dict with keys : 'image' and 'targets'
 
@@ -124,21 +131,18 @@ if __name__ == '__main__':
         for batch_index, batch in enumerate(dataloader):
             # batch = iter(dataloader).next()
             # batch = batch[batch_index]
-            print('atleast here')
-            # batch = batch[0]
-            # print(batch['image'])
-            im = [Variable(i).float() for i in batch['image']]
-            print('pass')
+            # im = [i[0]['image'] for i in batch]
+            # gt_boxes = [i[0]['gt_boxes'] for i in batch]
+            # gt_classes = [i[0]['gt_classes'] for i in batch]
+            # dontcare = [i[0]['dontcare'] for i in batch]
+
+            im = batch['image']
             gt_boxes = batch['gt_boxes']
             gt_classes = batch['gt_classes']
             dontcare = batch['dontcare']
-            # print(im, gt_boxes, gt_classes)
-            # dontcare = batch['dontcare']
-            # origin_im = batch['origin_im']
 
             # forward
-            print('here')
-            # im_data = net_utils.np_to_variable(im, is_cuda=True, volatile=False).permute(0, 3, 1, 2) #Already permuted
+            im = torch_to_variable(im, is_cuda=True, volatile=False)  # Already permuted
             bbox_pred, iou_pred, prob_pred = net(im.cuda(), gt_boxes=gt_boxes, gt_classes=gt_classes, dontcare=dontcare, size_index=size_index)
 
             # backward

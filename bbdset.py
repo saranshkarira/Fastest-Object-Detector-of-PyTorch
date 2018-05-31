@@ -44,7 +44,7 @@ class dataset(data.Dataset):
         with open(target_file) as opener:
             self.targets = json.load(opener)
         self.multiscale = multiscale
-        self.tubelight = {'image': [], 'gt_boxes': [], 'gt_classes': [], 'dontcare': []}
+        self.sample = {'image': [], 'gt_boxes': [], 'gt_classes': [], 'dontcare': []}
 # len
 
     def __len__(self):
@@ -84,25 +84,29 @@ class dataset(data.Dataset):
                     gt_boxes.append(anns)
                     gt_classes.append(self.class_map[k])
 
-        sample = {'image': image, 'gt_classes': np.asarray(gt_classes), 'gt_boxes': np.asarray(gt_boxes).reshape(-1, 4), 'dontcare': self.multiscale}  # .reshape(-1, 2)}
+        self.sample = {'image': image, 'gt_classes': np.asarray(gt_classes), 'gt_boxes': np.asarray(gt_boxes).reshape(-1, 4), 'dontcare': np.asarray(self.multiscale)}  # .reshape(-1, 2)}
 
         if self.transform or True:
             rescale = Rescale(500)
-            rescale(sample)
+            rescale(self.sample)
             random_crop = RandomCrop(416)
-            random_crop(sample)
-            print(sample['image'].shape)
+            random_crop(self.sample)
+            # totensor = ToTensor()
+            # totensor(self.sample)
+            # print(sample['image'].shape)
 
-        sample['image'] = np.rollaxis(sample['image'], axis=2, start=0)
+        self.sample['image'] = np.rollaxis(self.sample['image'], axis=2, start=0)
         # sample = [sample]
 
         # sample['image'] = Image.fromarray(sample['image'])
-        self.tubelight['image'].append(sample['image'])
-        self.tubelight['gt_classes'].append(sample['gt_classes'])
-        self.tubelight['gt_boxes'].append(sample['gt_boxes'])
-        self.tubelight['dontcare'].append(sample['dontcare'])
-        return self.tubelight
+        # self.tubelight['image'].append(sample['image'])
+        # self.tubelight['gt_classes'].append(sample['gt_classes'])
+        # self.tubelight['gt_boxes'].append(sample['gt_boxes'])
+        # self.tubelight['dontcare'].append(sample['dontcare'])
 
+        # self.tubelight['image'] = np.asarray(self.tubelight['image'])
+        print([self.sample[key].shape for key in self.sample], '\n')
+        return self.sample
     # transforms
 
 # Rescale
@@ -173,7 +177,8 @@ class RandomCrop(object):
 
         sample['image'] = image[top: top + new_h, left: left + new_w]
 
-        sample['gt_boxes'] = gt_boxes - [left, top, left, top]
+        sample['gt_boxes'] = (
+            gt_boxes - [left, top, left, top])
 
 # ToTensor
 
@@ -187,6 +192,8 @@ class ToTensor(object):
         # swap color axis because
         # numpy image: H x W x C
         # torch image: C X H X W
-        image = image.transpose((2, 0, 1))
+        # image = image.transpose((2, 0, 1))
         return {'image': torch.from_numpy(image),
-                'gt_boxes': torch.from_numpy(gt_boxes), 'gt_classes': torch.from_numpy(sample['gt_classes'])}
+                'gt_boxes': torch.from_numpy(gt_boxes),
+                'gt_classes': torch.from_numpy(sample['gt_classes']),
+                'dontcare': torch.from_numpy(sample['dontcare'])}

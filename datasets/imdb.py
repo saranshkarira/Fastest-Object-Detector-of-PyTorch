@@ -9,7 +9,7 @@ import cv2
 def mkdir(path, max_depth=3):
     parent, child = os.path.split(path)
     if not os.path.exists(parent) and max_depth > 1:
-        mkdir(parent, max_depth-1)
+        mkdir(parent, max_depth - 1)
 
     if not os.path.exists(path):
         os.mkdir(path)
@@ -53,9 +53,9 @@ class ImageDataset(object):
         i = 0
         while i < self.batch_size:
             try:
-                images, gt_boxes, classes, dontcare, origin_im = next(self.gen)
+                images, gt_boxes, classes, dontcare, origin_im = next(self.gen)  # like get item
                 images = image_resize(images, size_index)
-                batch['images'].append(images)
+                batch['images'].append(images)  # making a list out of gotten item
                 batch['gt_boxes'].append(gt_boxes)
                 batch['gt_classes'].append(classes)
                 batch['dontcare'].append(dontcare)

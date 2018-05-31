@@ -38,10 +38,11 @@ def _make_layers(in_channels, net_cfg):
 
 
 def _process_batch(data, size_index):
+
     W, H = cfg.multi_scale_out_size[size_index]
     inp_size = cfg.multi_scale_inp_size[size_index]
     out_size = cfg.multi_scale_out_size[size_index]
-
+    ###
     bbox_pred_np, gt_boxes, gt_classes, dontcares, iou_pred_np = data
 
     # net output
@@ -58,7 +59,7 @@ def _process_batch(data, size_index):
     _boxes[:, :, 0:2] = 0.5
     _boxes[:, :, 2:4] = 1.0
     _box_mask = np.zeros([hw, num_anchors, 1], dtype=np.float) + 0.01
-
+    ###
     # scale pred_bbox
     anchors = np.ascontiguousarray(cfg.anchors, dtype=np.float)
     bbox_pred_np = np.expand_dims(bbox_pred_np, 0)
@@ -70,20 +71,23 @@ def _process_batch(data, size_index):
     bbox_np = bbox_np[0]
     bbox_np[:, :, 0::2] *= float(inp_size[0])  # rescale x
     bbox_np[:, :, 1::2] *= float(inp_size[1])  # rescale y
-
+    ###
     # gt_boxes_b = np.asarray(gt_boxes[b], dtype=np.float)
     gt_boxes_b = np.asarray(gt_boxes, dtype=np.float)
-
+    ###
     # for each cell, compare predicted_bbox and gt_bbox
     bbox_np_b = np.reshape(bbox_np, [-1, 4])
     ious = bbox_ious(
         np.ascontiguousarray(bbox_np_b, dtype=np.float),
         np.ascontiguousarray(gt_boxes_b, dtype=np.float)
     )
+    ###
+    print(ious)
     best_ious = np.max(ious, axis=1).reshape(_iou_mask.shape)
+    # !
     iou_penalty = 0 - iou_pred_np[best_ious < cfg.iou_thresh]
     _iou_mask[best_ious <= cfg.iou_thresh] = cfg.noobject_scale * iou_penalty
-
+    # !
     # locate the cell of each gt_boxe
     cell_w = float(inp_size[0]) / W
     cell_h = float(inp_size[1]) / H
@@ -167,7 +171,7 @@ class Darknet19(nn.Module):
         # stride*stride times the channels of conv1s
         self.reorg = ReorgLayer(stride=2)
         # cat [conv1s, conv3]
-        self.conv4, c4 = _make_layers((c1*(stride*stride) + c3), net_cfgs[7])
+        self.conv4, c4 = _make_layers((c1 * (stride * stride) + c3), net_cfgs[7])
 
         # linear
         out_channels = cfg.num_anchors * (cfg.num_classes + 5)
@@ -283,7 +287,7 @@ class Darknet19(nn.Module):
         for i, start in enumerate(range(0, len(keys), 5)):
             if num_conv is not None and i >= num_conv:
                 break
-            end = min(start+5, len(keys))
+            end = min(start + 5, len(keys))
             for key in keys[start:end]:
                 list_key = key.split('.')
                 ptype = dest_src['{}.{}'.format(list_key[-2], list_key[-1])]
