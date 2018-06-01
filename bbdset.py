@@ -39,10 +39,19 @@ class dataset(data.Dataset):
             mapping = cursor.get('mapping')
             self.mapping = pickle.loads(mapping)  # mapping.decode('base64', 'strict'))
 
+        if classes is None:
+            self._classes = {'Weapon', 'Vehicle', 'Building', 'Person'}
+        else:
+            self._classes = classes
+
+
+
         self.class_map = {'Weapon': [0], 'Vehicle': [1], 'Building': [2], 'Person': [3]}
 
         with open(target_file) as opener:
             self.targets = json.load(opener)
+        
+        self._salt = str()
         self.multiscale = multiscale
         self.sample = {'image': [], 'gt_boxes': [], 'gt_classes': [], 'dontcare': []}
 # len
@@ -53,17 +62,74 @@ class dataset(data.Dataset):
     # getitem
 
     def __getitem__(self, idx):
+        return idx
 
-        print(idx)
-        image_id = self.mapping[idx]
+    #### START #####
+
+    def fetch_batch_data(self, ith, x, size_index):
+        #lmdb parse
+
+        images, gt_boxes, classes, dontcare = self._im_processor()
+
+
+    def fetch_parse(self, index, size_index):
+        index = index.numpy()
+        lenindex = len(index)
+        self.batch = {'images': []+ list(lenindex),
+                      'gt_boxes': []+ list(lenindex),
+                      'gt_classes' : []+ list(lenindex),
+                      'dontcare' : []+ list(lenindex),
+                      'origin_im' : []+ list(lenindex)}
+
+        images, gt_boxes, classes, dontcare = self.preprocess_train(self, index, size_index, self.dst_size)
+
+    def clip_boxes(boxes, im_shape):
+        """
+        Clip boxes to image boundaries.
+        """
+        if boxes.shape[0] == 0:
+            return boxes
+
+        # x1 >= 0
+        boxes[:, 0::4] = np.maximum(np.minimum(boxes[:, 0::4], im_shape[1] - 1), 0)
+        # y1 >= 0
+        boxes[:, 1::4] = np.maximum(np.minimum(boxes[:, 1::4], im_shape[0] - 1), 0)
+        # x2 < im_shape[1]
+        boxes[:, 2::4] = np.maximum(np.minimum(boxes[:, 2::4], im_shape[1] - 1), 0)
+        # y2 < im_shape[0]
+        boxes[:, 3::4] = np.maximum(np.minimum(boxes[:, 3::4], im_shape[0] - 1), 0)
+        return boxes
+
+    def _offset_boxes(boxes, im_shape, scale, offs, flip):
+        if len(boxes) == 0:
+            return boxes
+        boxes = np.asarray(boxes, dtype=np.float)
+        boxes *= scale
+        boxes[:, 0::2] -= offs[0]
+        boxes[:, 1::2] -= offs[1]
+        boxes = clip_boxes(boxes, im_shape)
+
+        if flip:
+            boxes_x = np.copy(boxes[:, 0])
+            boxes[:, 0] = im_shape[1] - boxes[:, 2]
+            boxes[:, 2] = im_shape[1] - boxes_x
+
+        return boxes
+
+    def preprocess_train(self, index, size_index, inp_size):
+        data = []
+        images = []
+        inp_size = inp_size[size_index]
+
+        image_id = self.mapping[index] # use map function here
         with self.txn.cursor() as cursor:
-            data = cursor.get(image_id)  # rebuild dataloader library to load more than single index a time
+            data.append(cursor.get(image_id)) ##check cursor for list parsing
 
-        img = cv2.imdecode(np.fromstring(data, dtype=np.uint8), 1)
-        image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        im = cv2.imdecode(np.fromstring(data, dtype=np.uint8), 1) # make it Pool process
+        
 
-        # getting is a very often command so not making a function to prevent redirection overhead
-
+        # image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) already applied in affine tfms
+        # send to prepackaging tho
         # Targets
 
         gt_boxes = []
@@ -71,7 +137,8 @@ class dataset(data.Dataset):
 
         # keys = self.targets[idx].keys()
 
-        for k, v in self.targets[idx].iteritems():
+        # do it above image as this is lower cost op, this will reduce lock convoy and make it concurrent if possible
+        for k, v in self.targets[index].iteritems():
             if len(v) == 0:
                 continue
 
@@ -84,29 +151,42 @@ class dataset(data.Dataset):
                     gt_boxes.append(anns)
                     gt_classes.append(self.class_map[k])
 
-        self.sample = {'image': image, 'gt_classes': np.asarray(gt_classes), 'gt_boxes': np.asarray(gt_boxes).reshape(-1, 4), 'dontcare': np.asarray(self.multiscale)}  # .reshape(-1, 2)}
 
-        if self.transform or True:
-            rescale = Rescale(500)
-            rescale(self.sample)
-            random_crop = RandomCrop(416)
-            random_crop(self.sample)
-            # totensor = ToTensor()
-            # totensor(self.sample)
-            # print(sample['image'].shape)
 
-        self.sample['image'] = np.rollaxis(self.sample['image'], axis=2, start=0)
-        # sample = [sample]
 
-        # sample['image'] = Image.fromarray(sample['image'])
-        # self.tubelight['image'].append(sample['image'])
-        # self.tubelight['gt_classes'].append(sample['gt_classes'])
-        # self.tubelight['gt_boxes'].append(sample['gt_boxes'])
-        # self.tubelight['dontcare'].append(sample['dontcare'])
+        ori_im = np.copy(im)
 
-        # self.tubelight['image'] = np.asarray(self.tubelight['image'])
-        print([self.sample[key].shape for key in self.sample], '\n')
-        return self.sample
+        im, box_shape, trans_param = imcv2_affine_trans(im)
+
+        #analyse the below twos
+        scale, offs, flip = trans_param
+        gt_boxes = _offset_boxes(gt_boxes, im.shape, scale, offs, flip)
+
+        if inp_size is not None: #bbox axis is flipped from the image axis, or is it??
+            w, h = inp_size
+            gt_boxes[:, 0::2] *= float(w) / im.shape[1]
+            gt_boxes[:, 1::2] *= float(h) / im.shape[0]
+            im = cv2.resize(im, (w, h))
+
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+        im = imcv2_recolor(im)
+        # im /= 255.
+
+        # im = imcv2_recolor(im)
+        # h, w = inp_size
+        # im = cv2.resize(im, (w, h))
+        # im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+        # im /= 255
+        gt_boxes = np.asarray(boxes, dtype=np.int)
+        return im, gt_boxes, gt_classes, [], ori_im
+
+
+
+
+
+
+    #######END#######
+
     # transforms
 
 # Rescale
