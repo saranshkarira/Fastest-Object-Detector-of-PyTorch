@@ -12,6 +12,7 @@ import cv2
 from skimage import transform as sktransform
 import json
 import lmdb
+from datasets.imdb import ImageDataset
 import pickle
 from utils.im_transform import imcv2_affine_trans, imcv2_recolor
 import threading
@@ -21,7 +22,7 @@ import threading
 # Dataclass
 
 
-class dataset(data.Dataset):
+class dataset(data.Dataset, ImageDataset):
     def __init__(self, target_file, root_dir, multiscale, transforms=True):
         """
         Args:
@@ -134,7 +135,7 @@ class dataset(data.Dataset):
                     gt_classes.append(self.class_map[k])
 
         ori_im = np.copy(im)
-        print(im.shape)
+        # print(im.shape)
         im, trans_param = imcv2_affine_trans(im)
 
         # analyse the below twos

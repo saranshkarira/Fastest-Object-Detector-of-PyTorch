@@ -143,9 +143,13 @@ if __name__ == '__main__':
             origin_im = ['origin_im']
             print(cnt, 'I am fucking working')
             # forward
-            im = net_utils.np_to_variable(im,
-                                          is_cuda=True,
-                                          volatile=False).permute(0, 3, 1, 2)
+            try:
+                im = net_utils.np_to_variable(im,
+                                              is_cuda=True,
+                                              volatile=False).permute(0, 3, 1, 2)
+            except:
+                continue
+
             bbox_pred, iou_pred, prob_pred = net(im.cuda(), gt_boxes=gt_boxes, gt_classes=gt_classes, dontcare=dontcare, size_index=size_index)
 
             # backward
