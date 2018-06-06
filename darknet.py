@@ -240,7 +240,7 @@ class Darknet19(nn.Module):
                                                   dtype=torch.FloatTensor)
 
             num_boxes = sum((len(boxes) for boxes in gt_boxes))
-
+            print(num_boxes, 'here are the number of boxes')
             # _boxes[:, :, :, 2:4] = torch.log(_boxes[:, :, :, 2:4])
             box_mask = box_mask.expand_as(_boxes)
 

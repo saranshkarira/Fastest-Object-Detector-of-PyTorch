@@ -13,6 +13,8 @@ from skimage import transform as sktransform
 import json
 import lmdb
 import pickle
+from utils.im_transform import imcv2_affine_trans, imcv2_recolor
+import threading
 # import torchvision.transforms
 # import pprint
 # from PIL import Image
@@ -38,21 +40,19 @@ class dataset(data.Dataset):
             self.length = self.txn.stat()['entries'] - 1  # for mapping
             mapping = cursor.get('mapping')
             self.mapping = pickle.loads(mapping)  # mapping.decode('base64', 'strict'))
-
+        classes = None
         if classes is None:
             self._classes = {'Weapon', 'Vehicle', 'Building', 'Person'}
         else:
             self._classes = classes
 
-
-
         self.class_map = {'Weapon': [0], 'Vehicle': [1], 'Building': [2], 'Person': [3]}
 
         with open(target_file) as opener:
             self.targets = json.load(opener)
-        
+
         self._salt = str()
-        self.multiscale = multiscale
+        self.dst_size = multiscale
         self.sample = {'image': [], 'gt_boxes': [], 'gt_classes': [], 'dontcare': []}
 # len
 
@@ -64,26 +64,9 @@ class dataset(data.Dataset):
     def __getitem__(self, idx):
         return idx
 
-    #### START #####
+    # ### START #####
 
-    def fetch_batch_data(self, ith, x, size_index):
-        #lmdb parse
-
-        images, gt_boxes, classes, dontcare = self._im_processor()
-
-
-    def fetch_parse(self, index, size_index):
-        index = index.numpy()
-        lenindex = len(index)
-        self.batch = {'images': []+ list(lenindex),
-                      'gt_boxes': []+ list(lenindex),
-                      'gt_classes' : []+ list(lenindex),
-                      'dontcare' : []+ list(lenindex),
-                      'origin_im' : []+ list(lenindex)}
-
-        images, gt_boxes, classes, dontcare = self.preprocess_train(self, index, size_index, self.dst_size)
-
-    def clip_boxes(boxes, im_shape):
+    def clip_boxes(self, boxes, im_shape):
         """
         Clip boxes to image boundaries.
         """
@@ -100,14 +83,14 @@ class dataset(data.Dataset):
         boxes[:, 3::4] = np.maximum(np.minimum(boxes[:, 3::4], im_shape[0] - 1), 0)
         return boxes
 
-    def _offset_boxes(boxes, im_shape, scale, offs, flip):
+    def _offset_boxes(self, boxes, im_shape, scale, offs, flip):
         if len(boxes) == 0:
             return boxes
         boxes = np.asarray(boxes, dtype=np.float)
         boxes *= scale
         boxes[:, 0::2] -= offs[0]
         boxes[:, 1::2] -= offs[1]
-        boxes = clip_boxes(boxes, im_shape)
+        boxes = self.clip_boxes(boxes, im_shape)
 
         if flip:
             boxes_x = np.copy(boxes[:, 0])
@@ -116,17 +99,16 @@ class dataset(data.Dataset):
 
         return boxes
 
-    def preprocess_train(self, index, size_index, inp_size):
-        data = []
-        images = []
-        inp_size = inp_size[size_index]
+    def preprocess_train(self, index, size_index, multi_scale_inp_size):
+        # data = []
+        # images = []
+        inp_size = multi_scale_inp_size[size_index]
 
-        image_id = self.mapping[index] # use map function here
-        with self.txn.cursor() as cursor:
-            data.append(cursor.get(image_id)) ##check cursor for list parsing
+        image_id = self.mapping[index]  # use map function here
+        with self.txn.cursor() as cursor:  # cannot append before preprocessZ
+            im = cursor.get(image_id)  # check cursor for list parsing #append becouse we are getting images manually now
 
-        im = cv2.imdecode(np.fromstring(data, dtype=np.uint8), 1) # make it Pool process
-        
+        im = cv2.imdecode(np.fromstring(im, dtype=np.uint8), 1)  # make it Pool process
 
         # image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) already applied in affine tfms
         # send to prepackaging tho
@@ -151,18 +133,15 @@ class dataset(data.Dataset):
                     gt_boxes.append(anns)
                     gt_classes.append(self.class_map[k])
 
-
-
-
         ori_im = np.copy(im)
+        print(im.shape)
+        im, trans_param = imcv2_affine_trans(im)
 
-        im, box_shape, trans_param = imcv2_affine_trans(im)
-
-        #analyse the below twos
+        # analyse the below twos
         scale, offs, flip = trans_param
-        gt_boxes = _offset_boxes(gt_boxes, im.shape, scale, offs, flip)
+        gt_boxes = self._offset_boxes(gt_boxes, im.shape, scale, offs, flip)
 
-        if inp_size is not None: #bbox axis is flipped from the image axis, or is it??
+        if inp_size is not None:  # bbox axis is flipped from the image axis, or is it??
             w, h = inp_size
             gt_boxes[:, 0::2] *= float(w) / im.shape[1]
             gt_boxes[:, 1::2] *= float(h) / im.shape[0]
@@ -177,15 +156,54 @@ class dataset(data.Dataset):
         # im = cv2.resize(im, (w, h))
         # im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         # im /= 255
-        gt_boxes = np.asarray(boxes, dtype=np.int)
+        # gt_boxes = np.asarray(boxes, dtype=np.int)
         return im, gt_boxes, gt_classes, [], ori_im
 
+    def fetch_batch(self, ith, index, size_index, dst_size):
+        images, gt_boxes, classes, dontcare, origin_im = self.preprocess_train(index, size_index, dst_size)
+        print(ith)
+        self.batch['images'][ith] = images
+        self.batch['gt_boxes'][ith] = gt_boxes
+        self.batch['gt_classes'][ith] = classes
+        self.batch['dontcare'][ith] = dontcare
+        self.batch['origin_im'][ith] = origin_im
 
+    # def to_tensor(self):
+    #     sample = self.batch
+    #     # swap color axis because
+    #     # numpy image: H x W x C
+    #     # torch image: C X H X W
+    #     # image = image.transpose((2, 0, 1))
+    #     return {'images': torch.Tensor(sample['images']),
+    #             'gt_boxes': torch.from_numpy(sample['gt_boxes']),
+    #             'gt_classes': torch.Tensor(sample['gt_classes']),
+    #             'dontcare': torch.from_numpy(np.asarray(sample['dontcare']))}
 
+    def fetch_parse(self, index, size_index):
+        index = index.numpy()
+        lenindex = len(index)
+        self.batch = {'images': [list()] * lenindex,
+                      'gt_boxes': [list()] * lenindex,
+                      'gt_classes': [list()] * lenindex,
+                      'dontcare': [list()] * lenindex,
+                      'origin_im': [list()] * lenindex}
 
+        ths = []
 
+        for ith in range(lenindex):
+            ths.append(threading.Thread(target=self.fetch_batch, args=(ith, index[ith], size_index, self.dst_size)))
+            ths[ith].start()
+        for ith in range(lenindex):
+            ths[ith].join()
+        # x = [(x.shape) for x in self.batch['gt_boxes']]
+        # print(np.asarray(self.batch['gt_boxes']).shape, 'goda')
+        self.batch['images'] = np.asarray(self.batch['images'])
+        # self.batch['gt_boxes'] = self.batch['gt_boxes']
+        # self.batch = self.to_tensor()
+        return self.batch
+        # images, gt_boxes, classes, dontcare, origin_im = preprocess_train(index, size_index, self.dst_size)
 
-    #######END#######
+    # ######END#######
 
     # transforms
 
@@ -259,21 +277,3 @@ class RandomCrop(object):
 
         sample['gt_boxes'] = (
             gt_boxes - [left, top, left, top])
-
-# ToTensor
-
-
-class ToTensor(object):
-    """Convert ndarrays in sample to Tensors."""
-
-    def __call__(self, sample):
-        image, gt_boxes = sample['image'], sample['gt_boxes']
-
-        # swap color axis because
-        # numpy image: H x W x C
-        # torch image: C X H X W
-        # image = image.transpose((2, 0, 1))
-        return {'image': torch.from_numpy(image),
-                'gt_boxes': torch.from_numpy(gt_boxes),
-                'gt_classes': torch.from_numpy(sample['gt_classes']),
-                'dontcare': torch.from_numpy(sample['dontcare'])}

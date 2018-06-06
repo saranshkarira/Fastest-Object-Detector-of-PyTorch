@@ -40,11 +40,11 @@ from bbdset import dataset as dset
 # parsing the target dictionaries
 
 
-def torch_to_variable(x, is_cuda=True, dtype=torch.FloatTensor, volatile=False):
-    v = torch.autograd.Variable(x.type(dtype), volatile=volatile)
-    if is_cuda:
-        v = v.cuda()
-    return v
+# def torch_to_variable(x, is_cuda=True, dtype=torch.FloatTensor, volatile=False):
+#     v = torch.autograd.Variable(x.type(dtype), volatile=volatile)
+#     if is_cuda:
+#         v = v.cuda()
+#     return v
 
 
 def arg_parse():
@@ -59,7 +59,7 @@ def arg_parse():
                         default="imgs", type=str)
     parser.add_argument("-w", dest='workers', help="number of workers to load the images",
                         default="4", type=int)
-    parser.add_argument("-b", dest="batch", help="Batch size", default=1, type=int)
+    parser.add_argument("-b", dest="batch", help="Batch size", default=50, type=int)
     # parser.add_argument("--confidence", dest = "confidence", help = "Object Confidence to filter predictions", default = 0.5)
     # parser.add_argument("--nms_thresh", dest = "nms_thresh", help = "NMS Threshhold", default = 0.4)
     parser.add_argument("-c", dest='cfgfile', help="Config file",
@@ -128,21 +128,24 @@ if __name__ == '__main__':
         # batman = [v for k, v in enumerate(dataloader)]
 
         # batch
-        for batch_index, batch in enumerate(dataloader):
+        for i, batch_of_index in enumerate(dataloader):
             # batch = iter(dataloader).next()
             # batch = batch[batch_index]
             # im = [i[0]['image'] for i in batch]
             # gt_boxes = [i[0]['gt_boxes'] for i in batch]
             # gt_classes = [i[0]['gt_classes'] for i in batch]
             # dontcare = [i[0]['dontcare'] for i in batch]
-
-            im = batch['image']
+            batch = dataset.fetch_parse(batch_of_index, size_index)
+            im = batch['images']
             gt_boxes = batch['gt_boxes']
             gt_classes = batch['gt_classes']
             dontcare = batch['dontcare']
-
+            origin_im = ['origin_im']
+            print(cnt, 'I am fucking working')
             # forward
-            im = torch_to_variable(im, is_cuda=True, volatile=False)  # Already permuted
+            im = net_utils.np_to_variable(im,
+                                          is_cuda=True,
+                                          volatile=False).permute(0, 3, 1, 2)
             bbox_pred, iou_pred, prob_pred = net(im.cuda(), gt_boxes=gt_boxes, gt_classes=gt_classes, dontcare=dontcare, size_index=size_index)
 
             # backward
