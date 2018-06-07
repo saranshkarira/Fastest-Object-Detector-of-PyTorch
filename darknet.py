@@ -82,7 +82,7 @@ def _process_batch(data, size_index):
         np.ascontiguousarray(gt_boxes_b, dtype=np.float)
     )
     ###
-    print(ious)
+    # print(ious)
     best_ious = np.max(ious, axis=1).reshape(_iou_mask.shape)
     # !
     iou_penalty = 0 - iou_pred_np[best_ious < cfg.iou_thresh]
@@ -117,8 +117,8 @@ def _process_batch(data, size_index):
     ious_reshaped = np.reshape(ious, [hw, num_anchors, len(cell_inds)])
     for i, cell_ind in enumerate(cell_inds):
         if cell_ind >= hw or cell_ind < 0:
-            print('cell inds size {}'.format(len(cell_inds)))
-            print('cell over {} hw {}'.format(cell_ind, hw))
+            # print('cell inds size {}'.format(len(cell_inds)))
+            # print('cell over {} hw {}'.format(cell_ind, hw))
             continue
         a = anchor_inds[i]
 
@@ -240,7 +240,7 @@ class Darknet19(nn.Module):
                                                   dtype=torch.FloatTensor)
 
             num_boxes = sum((len(boxes) for boxes in gt_boxes))
-            print(num_boxes, 'here are the number of boxes')
+            # print(num_boxes, 'here are the number of boxes')
             # _boxes[:, :, :, 2:4] = torch.log(_boxes[:, :, :, 2:4])
             box_mask = box_mask.expand_as(_boxes)
 

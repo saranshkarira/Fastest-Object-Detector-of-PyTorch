@@ -109,7 +109,7 @@ if __name__ == '__main__':
     start_epoch = 0
     lr = cfg.init_learning_rate
     optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
-
+    optimizer.zero_grad()
     # tensorboard
     if args.use_tensorboard and SummaryWriter is not None:
         summary_writer = SummaryWriter(os.path.join(cfg.TRAIN_DIR, 'runs', cfg.exp_name))
@@ -123,6 +123,7 @@ if __name__ == '__main__':
     step_cnt = 0
     size_index = 0
     t = Timer()
+    epoch = start_epoch
     for step in range(start_epoch, cfg.max_epoch):
         t.tic()
         # batman = [v for k, v in enumerate(dataloader)]
@@ -141,7 +142,7 @@ if __name__ == '__main__':
             gt_classes = batch['gt_classes']
             dontcare = batch['dontcare']
             origin_im = ['origin_im']
-            print(cnt, 'I am fucking working')
+            print(cnt, 'I am working')
             # forward
             try:
                 im = net_utils.np_to_variable(im,
@@ -166,40 +167,42 @@ if __name__ == '__main__':
             step_cnt += 1
             duration = t.toc()
 
-        if step % cfg.disp_interval == 0:
-            train_loss /= cnt
-            bbox_loss /= cnt
-            iou_loss /= cnt
-            cls_loss /= cnt
+            if step % cfg.disp_interval == 0:
+                train_loss /= cnt
+                bbox_loss /= cnt
+                iou_loss /= cnt
+                cls_loss /= cnt
 
-            print(('epoch %d[%d/%d], loss: %.3f, bbox_loss: %.3f, iou_loss: %.3f, '
-                   'cls_loss: %.3f (%.2f s/batch, rest:%s)' %
-                   (dataloader.epoch, step_cnt, batch_per_epoch, train_loss, bbox_loss,
-                    iou_loss, cls_loss, duration,
-                    str(datetime.timedelta(seconds=int((batch_per_epoch - step_cnt) * duration))))))
+                print(('epoch %d[%d/%d], loss: %.3f, bbox_loss: %.3f, iou_loss: %.3f, '
+                       'cls_loss: %.3f (%.2f s/batch, rest:%s)' %
+                       (epoch, step_cnt, batch_per_epoch, train_loss, bbox_loss,
+                        iou_loss, cls_loss, duration,
+                        str(datetime.timedelta(seconds=int((batch_per_epoch - step_cnt) * duration))))))
 
-        if summary_writer and step % cfg.log_interval == 0:
-            summary_writer.add_scalar('loss_train', train_loss, step)
-            summary_writer.add_scalar('loss_bbox', bbox_loss, step)
-            summary_writer.add_scalar('loss_iou', iou_loss, step)
-            summary_writer.add_scalar('loss_cls', cls_loss, step)
-            summary_writer.add_scalar('learning_rate', lr, step)
+            if summary_writer and step % cfg.log_interval == 0:
+                summary_writer.add_scalar('loss_train', train_loss, step)
+                summary_writer.add_scalar('loss_bbox', bbox_loss, step)
+                summary_writer.add_scalar('loss_iou', iou_loss, step)
+                summary_writer.add_scalar('loss_cls', cls_loss, step)
+                summary_writer.add_scalar('learning_rate', lr, step)
 
-            train_loss = 0
-            bbox_loss, iou_loss, cls_loss = 0., 0., 0.
-            cnt = 0
-            t.clear()
-            size_index = randint(0, len(cfg.multi_scale_inp_size) - 1)
+        print('i break here')
+        train_loss = 0
+        bbox_loss, iou_loss, cls_loss = 0., 0., 0.
+        cnt = 0
+        t.clear()
+        size_index = randint(0, len(cfg.multi_scale_inp_size) - 1)
 
-        if step > 0 and (step % dataloader.batch_per_epoch == 0):
-            if dataloader.epoch in cfg.lr_decay_epochs:
+        if step > 0:  # and (step % batch_per_epoch == 0): since this only runs when an epoch is complete
+            if epoch in cfg.lr_decay_epochs:
                 lr *= cfg.lr_decay
                 optimizer = torch.optime.SGD(net.parameters(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
 
             save_name = os.path.join(cfg.train_output_dir,
-                                     '{}_{}.h5'.format(cfg.exp_name, dataloader.epoch))
+                                     '{}_{}.h5'.format(cfg.exp_name, epoch))
             net_utils.save_net(save_name, net)
             print(('save model: {}'.format(save_name)))
             step_cnt = 0
+        epoch += 1
 
     dataloader.close()

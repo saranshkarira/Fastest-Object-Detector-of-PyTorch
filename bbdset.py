@@ -2,7 +2,7 @@
 # sT# targets are treated as a [-1,2] matrix of points of polygon with 2 coordinates
 # Imports
 import torch.utils.data as data
-import torch
+# import torch
 # import pandas as pd  # what about hdf5
 # import os
 import numpy as np
@@ -122,8 +122,8 @@ class dataset(data.Dataset, ImageDataset):
 
         # do it above image as this is lower cost op, this will reduce lock convoy and make it concurrent if possible
         for k, v in self.targets[index].iteritems():
-            if len(v) == 0:
-                continue
+            if len(v) == 0 or isinstance(v, (str)):
+                pass
 
             elif isinstance(v[0], (int)):
                 gt_boxes.append(v)
@@ -162,7 +162,7 @@ class dataset(data.Dataset, ImageDataset):
 
     def fetch_batch(self, ith, index, size_index, dst_size):
         images, gt_boxes, classes, dontcare, origin_im = self.preprocess_train(index, size_index, dst_size)
-        print(ith)
+        # print(ith)
         self.batch['images'][ith] = images
         self.batch['gt_boxes'][ith] = gt_boxes
         self.batch['gt_classes'][ith] = classes

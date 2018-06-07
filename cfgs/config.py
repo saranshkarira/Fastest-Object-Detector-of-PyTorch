@@ -1,7 +1,7 @@
 import os
 from .config_vmr import *  # noqa
 from .exps.darknet19_exp1 import *  # noqa
-
+import glob
 
 # import per experiments based parameters
 
@@ -72,7 +72,8 @@ TRAIN_DIR = os.path.join(MODEL_DIR, 'training')
 TEST_DIR = os.path.join(MODEL_DIR, 'testing')
 
 root_dir = os.path.join(ROOT_DIR, 'db', 'image_data')
-target_file = os.path.join(ROOT_DIR, 'db', 'targets', 'encoded.json')
+target_file = os.path.join(ROOT_DIR, 'db', 'targets', '*.json')
+target_file = glob.glob(target_file)[0]
 transforms = False
 
 trained_model = os.path.join(MODEL_DIR, h5_fname)
