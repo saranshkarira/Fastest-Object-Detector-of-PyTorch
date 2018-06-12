@@ -32,6 +32,7 @@ except ImportError:
     SummaryWriter = None
 
 from bbdset import dataset as dset
+import time
 # from torch.autograd import Variable
 
 # #########FUNCTIONS#################
@@ -80,6 +81,9 @@ def arg_parse():
 
 
 if __name__ == '__main__':
+    path = os.path.join(cfg.TRAIN_DIR, 'runs', str(round(time.time())))
+    if not os.path.exists(path):
+        os.makedirs(path)
 
     args = arg_parse()
     lmdb = 1
@@ -128,15 +132,15 @@ if __name__ == '__main__':
     start_epoch = 0
     lr = cfg.init_learning_rate
     if args.transfer:
-        optimizable = net.conv5.parameters()
+        optimizable = net.conv5.parameters
     else:
-        optimizable = net.parameters()
+        optimizable = net.parameters
 
-    optimizer = torch.optim.SGD(optimizable, lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
+    optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
     optimizer.zero_grad()
     # tensorboard
     if args.use_tensorboard and SummaryWriter is not None:
-        summary_writer = SummaryWriter(os.path.join(cfg.TRAIN_DIR, 'runs', cfg.exp_name))
+        summary_writer = SummaryWriter(path)
     # else:
     #     summary_writer = None
 
@@ -148,6 +152,7 @@ if __name__ == '__main__':
     size_index = 0
     t = Timer()
     epoch = start_epoch
+    j = 0
     for step in range(start_epoch, cfg.max_epoch):
         # batman = [v for k, v in enumerate(dataloader)]
 
@@ -189,6 +194,7 @@ if __name__ == '__main__':
             optimizer.step()
             cnt += 1
             step_cnt += 1
+            j += 1
             duration = t.toc()
             # print(step, cfg.disp_interval)
             if cnt % cfg.disp_interval == 0:
@@ -204,23 +210,24 @@ if __name__ == '__main__':
                         iou_loss, cls_loss, duration,
                         str(datetime.timedelta(seconds=int((batch_per_epoch - step_cnt) * duration))))))
 
-            if summary_writer and step % cfg.log_interval == 0:
-                summary_writer.add_scalar('loss_train', train_loss, step)
-                summary_writer.add_scalar('loss_bbox', bbox_loss, step)
-                summary_writer.add_scalar('loss_iou', iou_loss, step)
-                summary_writer.add_scalar('loss_cls', cls_loss, step)
-                summary_writer.add_scalar('learning_rate', lr, step)
-            t.clear()
+                summary_writer.add_scalar('loss_train', train_loss, j)
+                summary_writer.add_scalar('loss_bbox', bbox_loss, j)
+                summary_writer.add_scalar('loss_iou', iou_loss, j)
+                summary_writer.add_scalar('loss_cls', cls_loss, j)
+                summary_writer.add_scalar('learning_rate', lr, j)
+
+                train_loss = 0
+                bbox_loss, iou_loss, cls_loss = 0., 0., 0.
+                cnt = 0
+                t.clear()
         # print('i break here')
-        train_loss = 0
-        bbox_loss, iou_loss, cls_loss = 0., 0., 0.
-        cnt = 0
+
         size_index = randint(0, len(cfg.multi_scale_inp_size) - 1)
 
         if step > 0:  # and (step % batch_per_epoch == 0): since this only runs when an epoch is complete
             if epoch % cfg.lr_decay_epochs == 0:
                 lr *= cfg.lr_decay
-                optimizer = torch.optim.SGD(optimizable, lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
+                optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
 
             save_name = os.path.join(cfg.train_output_dir,
                                      '{}_{}.h5'.format(cfg.exp_name, epoch))

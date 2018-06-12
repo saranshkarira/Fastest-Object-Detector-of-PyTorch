@@ -86,5 +86,5 @@ mkdir(train_output_dir, max_depth=3)
 rand_seed = 1024
 use_tensorboard = True
 
-log_interval = 50
+log_interval = 10
 disp_interval = 10

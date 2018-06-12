@@ -4,7 +4,7 @@ import os
 import sys
 import lmdb
 import cv2
-import pickle
+# import pickle
 
 
 def write_to_db(env, batch):
@@ -42,10 +42,10 @@ def converter(output_path):
         # print(image_binary)
         # break
         # with open(image_path, 'r') as f:
-        #	image_binary = f.read()
+        # image_binary = f.read()
         imagekey = str.encode(image_name)
 
-        dicto[counter] = image_name  # mapping of iteratives to not trivially sorted image names
+        # dicto[counter] = image_name  # mapping of iteratives to not trivially sorted image names
 
         # arbitrarykey = str(counter)
         # batch[imagekey] = image_binary
@@ -60,10 +60,10 @@ def converter(output_path):
             print("flushing cache")
             batch = []
         counter += 1
-    dict_value = pickle.dumps(dicto)  # .encode('base64', 'strict')
+    # dict_value = pickle.dumps(dicto)  # .encode('base64', 'strict')
     # dict_value = str.encode(b64)
-    dict_key = str.encode('mapping')
-    batch.append((dict_key, dict_value))
+    # dict_key = str.encode('mapping')
+    # batch.append((dict_key, dict_value))
     write_to_db(env, batch)
 
 

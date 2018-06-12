@@ -3,7 +3,7 @@ exp_name = 'darknet19_voc07trainval_exp3'
 pretrained_fname = 'darknet19.weights.npz'
 
 start_step = 0
-lr_decay_epochs = 5
+lr_decay_epochs = 15
 lr_decay = 1. / 10
 
 max_epoch = 160

@@ -20,6 +20,7 @@ import threading
 # import pprint
 # from PIL import Image
 # Dataclass
+import sys
 
 
 class dataset(data.Dataset):
@@ -39,8 +40,8 @@ class dataset(data.Dataset):
         self.txn = self.env.begin(write=False)
         with self.txn.cursor() as cursor:
             self.length = self.txn.stat()['entries'] - 1  # for mapping
-            mapping = cursor.get('mapping')
-            self.mapping = pickle.loads(mapping)  # mapping.decode('base64', 'strict'))
+            # mapping = cursor.get('mapping')
+            # self.mapping = pickle.loads(mapping)  # mapping.decode('base64', 'strict'))
         classes = None
         if classes is None:
             self._classes = {'Weapon', 'Vehicle', 'Building', 'Person'}
@@ -105,8 +106,26 @@ class dataset(data.Dataset):
         # images = []
         inp_size = multi_scale_inp_size[size_index]
 
-        image_id = self.mapping[index]
-        print(image_id)  # use map function here
+        gt_boxes = []
+        gt_classes = []
+        # image_id = self.targets[index]['Var1'].split('/')[-1].encode()
+        for k, v in self.targets[index].iteritems():
+
+            if k == 'Var1':
+                image_id = v.split('/')[-1].encode()
+            # elif len(v) == 0:
+            #     pass
+
+            elif len(v) != 0 and isinstance(v[0], (int)):
+                gt_boxes.append(v)
+                gt_classes.append(self.class_map[k])
+
+            elif len(v) != 0 and isinstance(v[0], (list)):
+                for anns in v:
+                    gt_boxes.append(anns)
+                    gt_classes.append(self.class_map[k])
+        # image_id = self.mapping[index]
+        # use map function here
         with self.txn.cursor() as cursor:  # cannot append before preprocessZ
             im = cursor.get(image_id)  # check cursor for list parsing #append becouse we are getting images manually now
 
@@ -116,24 +135,9 @@ class dataset(data.Dataset):
         # send to prepackaging tho
         # Targets
 
-        gt_boxes = []
-        gt_classes = []
-
         # keys = self.targets[idx].keys()
 
         # do it above image as this is lower cost op, this will reduce lock convoy and make it concurrent if possible
-        for k, v in self.targets[index].iteritems():
-            if len(v) == 0 or isinstance(v, (str)):
-                pass
-
-            elif isinstance(v[0], (int)):
-                gt_boxes.append(v)
-                gt_classes.append(self.class_map[k])
-
-            elif isinstance(v[0], (list)):
-                for anns in v:
-                    gt_boxes.append(anns)
-                    gt_classes.append(self.class_map[k])
 
         ori_im = np.copy(im)
         # print(im.shape)
@@ -147,10 +151,14 @@ class dataset(data.Dataset):
             w, h = inp_size
             # print(im.shape)
             # print(gt_boxes.shape)
-            gt_boxes[:, 0::2] *= float(w) / im.shape[1]
-            gt_boxes[:, 1::2] *= float(h) / im.shape[0]
+            try:
+                gt_boxes[:, 0::2] *= float(w) / im.shape[1]
+                gt_boxes[:, 1::2] *= float(h) / im.shape[0]
+            except IndexError:
+                print(gt_boxes.shape)
+                sys.exit(1)
             im = cv2.resize(im, (w, h))
-            print(gt_boxes.shape)
+            # print(gt_boxes.shape)
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         im = imcv2_recolor(im)
         # im /= 255.
