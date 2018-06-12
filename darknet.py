@@ -174,7 +174,7 @@ class Darknet19(nn.Module):
         self.conv4, c4 = _make_layers((c1 * (stride * stride) + c3), net_cfgs[7])
 
         # linear
-        out_channels = cfg.num_anchors * (cfg.num_classes + 5)
+        out_channels = cfg.num_anchors * (20 + 5)
         self.conv5 = net_utils.Conv2d(c4, out_channels, 1, 1, relu=False)
         self.global_average_pool = nn.AvgPool2d((1, 1))
 
@@ -215,12 +215,15 @@ class Darknet19(nn.Module):
         iou_pred = F.sigmoid(global_average_pool_reshaped[:, :, :, 4:5])
 
         score_pred = global_average_pool_reshaped[:, :, :, 5:].contiguous()
-        prob_pred = F.softmax(score_pred.view(-1, score_pred.size()[-1])).view_as(score_pred)  # noqa
 
+        prob_pred = F.softmax(score_pred.view(-1, score_pred.size()[-1])).view_as(score_pred)  # noqa
+        # print(score_pred.view(-1, score_pred.size()[-1]))
         # for training
         if self.training:
+
             bbox_pred_np = bbox_pred.data.cpu().numpy()
             iou_pred_np = iou_pred.data.cpu().numpy()
+            # print('1')
             _boxes, _ious, _classes, _box_mask, _iou_mask, _class_mask = \
                 self._build_target(bbox_pred_np,
                                    gt_boxes,
@@ -228,7 +231,7 @@ class Darknet19(nn.Module):
                                    dontcare,
                                    iou_pred_np,
                                    size_index)
-
+            # print('2')
             _boxes = net_utils.np_to_variable(_boxes)
             _ious = net_utils.np_to_variable(_ious)
             _classes = net_utils.np_to_variable(_classes)

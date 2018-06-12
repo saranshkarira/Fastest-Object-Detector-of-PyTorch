@@ -12,7 +12,7 @@ import cv2
 from skimage import transform as sktransform
 import json
 import lmdb
-from datasets.imdb import ImageDataset
+# from datasets.imdb import ImageDataset
 import pickle
 from utils.im_transform import imcv2_affine_trans, imcv2_recolor
 import threading
@@ -22,7 +22,7 @@ import threading
 # Dataclass
 
 
-class dataset(data.Dataset, ImageDataset):
+class dataset(data.Dataset):
     def __init__(self, target_file, root_dir, multiscale, transforms=True):
         """
         Args:
@@ -105,7 +105,8 @@ class dataset(data.Dataset, ImageDataset):
         # images = []
         inp_size = multi_scale_inp_size[size_index]
 
-        image_id = self.mapping[index]  # use map function here
+        image_id = self.mapping[index]
+        print(image_id)  # use map function here
         with self.txn.cursor() as cursor:  # cannot append before preprocessZ
             im = cursor.get(image_id)  # check cursor for list parsing #append becouse we are getting images manually now
 
@@ -140,14 +141,16 @@ class dataset(data.Dataset, ImageDataset):
 
         # analyse the below twos
         scale, offs, flip = trans_param
-        gt_boxes = self._offset_boxes(gt_boxes, im.shape, scale, offs, flip)
+        gt_boxes = np.asarray(self._offset_boxes(gt_boxes, im.shape, scale, offs, flip))
 
         if inp_size is not None:  # bbox axis is flipped from the image axis, or is it??
             w, h = inp_size
+            # print(im.shape)
+            # print(gt_boxes.shape)
             gt_boxes[:, 0::2] *= float(w) / im.shape[1]
             gt_boxes[:, 1::2] *= float(h) / im.shape[0]
             im = cv2.resize(im, (w, h))
-
+            print(gt_boxes.shape)
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         im = imcv2_recolor(im)
         # im /= 255.

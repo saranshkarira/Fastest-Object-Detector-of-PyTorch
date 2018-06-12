@@ -59,7 +59,9 @@ def arg_parse():
                         default="imgs", type=str)
     parser.add_argument("-w", dest='workers', help="number of workers to load the images",
                         default="4", type=int)
-    parser.add_argument("-b", dest="batch", help="Batch size", default=50, type=int)
+    parser.add_argument("-b", dest="batch", help="Batch size", default=30, type=int)
+
+    parser.add_argument("-tl", dest='transfer', help='transfer_learning', default=True, type=bool)
     # parser.add_argument("--confidence", dest = "confidence", help = "Object Confidence to filter predictions", default = 0.5)
     # parser.add_argument("--nms_thresh", dest = "nms_thresh", help = "NMS Threshhold", default = 0.4)
     parser.add_argument("-c", dest='cfgfile', help="Config file",
@@ -94,13 +96,30 @@ if __name__ == '__main__':
         # currently contains dict with keys : 'image' and 'targets'
 
     net = Darknet()
+    # net.to('cuda')
+
     # with open(args.cfgfile, 'r') as config:
     #     cfg = config
 
     # load from a checkpoint
     if False:
         net.load_from_npz(cfg.pretrained_model, num_conv=18)  # doubts
-    net.cuda()
+
+    # net = torch.nn.DataParallel(net, device_ids=range(torch.cuda.device_count()))
+
+    # If transfer flag
+    if args.transfer:
+        for params in net.parameters():
+            params.requires_grad = False
+        shape = net.conv5.conv.weight.shape
+        new_layer = net_utils.Conv2d(shape[1], 45, shape[2], 1, relu=False)
+        net.conv5 = new_layer  # make it generalizable
+        # print(shape)
+        print('Tranfer Learning Active')
+    net = net.cuda()
+    # os.environ['CUDA_VISIBLE_DEVICES'] = 0, 1, 2
+    # torch.cuda.manual_seed(seed)
+    # net = torch.nn.DataParallel(net).cuda()
     net.train()
 
     print('network loaded')
@@ -108,7 +127,12 @@ if __name__ == '__main__':
     # Optimizer
     start_epoch = 0
     lr = cfg.init_learning_rate
-    optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
+    if args.transfer:
+        optimizable = net.conv5.parameters()
+    else:
+        optimizable = net.parameters()
+
+    optimizer = torch.optim.SGD(optimizable, lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
     optimizer.zero_grad()
     # tensorboard
     if args.use_tensorboard and SummaryWriter is not None:
@@ -125,11 +149,11 @@ if __name__ == '__main__':
     t = Timer()
     epoch = start_epoch
     for step in range(start_epoch, cfg.max_epoch):
-        t.tic()
         # batman = [v for k, v in enumerate(dataloader)]
 
         # batch
         for i, batch_of_index in enumerate(dataloader):
+            t.tic()
             # batch = iter(dataloader).next()
             # batch = batch[batch_index]
             # im = [i[0]['image'] for i in batch]
@@ -142,7 +166,7 @@ if __name__ == '__main__':
             gt_classes = batch['gt_classes']
             dontcare = batch['dontcare']
             origin_im = ['origin_im']
-            print(cnt, 'I am working')
+            # print(cnt, 'I am working')
             # forward
             try:
                 im = net_utils.np_to_variable(im,
@@ -151,8 +175,8 @@ if __name__ == '__main__':
             except:
                 continue
 
-            bbox_pred, iou_pred, prob_pred = net(im.cuda(), gt_boxes=gt_boxes, gt_classes=gt_classes, dontcare=dontcare, size_index=size_index)
-
+            bbox_pred, iou_pred, prob_pred = net(im, gt_boxes=gt_boxes, gt_classes=gt_classes, dontcare=dontcare, size_index=size_index)
+            # print(im, gt_boxes, gt_classes, dontcare, size_index)
             # backward
             loss = net.loss
             bbox_loss += net.bbox_loss.data.cpu().numpy()[0]
@@ -166,8 +190,9 @@ if __name__ == '__main__':
             cnt += 1
             step_cnt += 1
             duration = t.toc()
-
-            if step % cfg.disp_interval == 0:
+            # print(step, cfg.disp_interval)
+            if cnt % cfg.disp_interval == 0:
+                # print('I am visiting india')
                 train_loss /= cnt
                 bbox_loss /= cnt
                 iou_loss /= cnt
@@ -185,24 +210,21 @@ if __name__ == '__main__':
                 summary_writer.add_scalar('loss_iou', iou_loss, step)
                 summary_writer.add_scalar('loss_cls', cls_loss, step)
                 summary_writer.add_scalar('learning_rate', lr, step)
-
-        print('i break here')
+            t.clear()
+        # print('i break here')
         train_loss = 0
         bbox_loss, iou_loss, cls_loss = 0., 0., 0.
         cnt = 0
-        t.clear()
         size_index = randint(0, len(cfg.multi_scale_inp_size) - 1)
 
         if step > 0:  # and (step % batch_per_epoch == 0): since this only runs when an epoch is complete
-            if epoch in cfg.lr_decay_epochs:
+            if epoch % cfg.lr_decay_epochs == 0:
                 lr *= cfg.lr_decay
-                optimizer = torch.optime.SGD(net.parameters(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
+                optimizer = torch.optim.SGD(optimizable, lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
 
             save_name = os.path.join(cfg.train_output_dir,
                                      '{}_{}.h5'.format(cfg.exp_name, epoch))
             net_utils.save_net(save_name, net)
             print(('save model: {}'.format(save_name)))
-            step_cnt = 0
+        step_cnt = 0
         epoch += 1
-
-    dataloader.close()
