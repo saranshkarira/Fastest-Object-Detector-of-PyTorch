@@ -23,7 +23,7 @@ import datetime
 from darknet import Darknet19 as Darknet
 from utils.timer import Timer
 from random import randint
-
+# import numpy as np
 
 import torchvision
 import argparse
@@ -107,11 +107,11 @@ if __name__ == '__main__':
     # load from a checkpoint
     if args.transfer:
         net.load_from_npz(cfg.pretrained_model, num_conv=18)
-        exp_name = str(round(time.time()))  # For tensorboard consistency on reloads
+        exp_name = round(time.time())  # For tensorboard consistency on reloads
     else:
-        exp_name = net_utils.load_net(cfg.trained_model, net)
+        exp_name = net_utils.load_net(cfg.trained_model, net)[0]
 
-    path = os.path.join(cfg.TRAIN_DIR, 'runs', exp_name)
+    path = os.path.join(cfg.TRAIN_DIR, 'runs', str(exp_name))
     if not os.path.exists(path):
         os.makedirs(path)
     # If transfer flag
