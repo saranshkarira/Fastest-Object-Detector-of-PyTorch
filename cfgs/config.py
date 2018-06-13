@@ -76,7 +76,7 @@ target_file = os.path.join(ROOT_DIR, 'db', 'targets', '*.json')
 target_file = glob.glob(target_file)[0]
 transforms = False
 
-trained_model = glob.glob(os.path.join(MODEL_DIR, '*.h5'))[0]
+trained_model = glob.glob(os.path.join(TRAIN_DIR, exp_name, '*.h5'))[-1]
 pretrained_model = glob.glob(os.path.join(MODEL_DIR, '*.npz'))[0]
 
 train_output_dir = os.path.join(TRAIN_DIR, exp_name)

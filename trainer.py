@@ -157,7 +157,7 @@ if __name__ == '__main__':
     t = Timer()
     epoch = start_epoch
     j = 0
-    for step in range(start_epoch, cfg.max_epoch):
+    for step in range(int(start_epoch), cfg.max_epoch):
         # batman = [v for k, v in enumerate(dataloader)]
 
         # batch
@@ -235,7 +235,7 @@ if __name__ == '__main__':
 
             save_name = os.path.join(cfg.train_output_dir,
                                      '{}_{}.h5'.format(cfg.exp_name, epoch))
-            net_utils.save_net(exp_name, step, lr, save_name, net)
+            net_utils.save_net(exp_name, step + 1, lr, save_name, net)
             print(('save model: {}'.format(save_name)))
         step_cnt = 0
         epoch += 1

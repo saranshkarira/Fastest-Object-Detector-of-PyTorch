@@ -77,7 +77,7 @@ def load_net(fname, net):
     for k, v in list(net.state_dict().items()):
         param = torch.from_numpy(np.asarray(h5f[k]))
         v.copy_(param)
-    return h5f['exp_name']
+    return h5f['exp_params']
 
 
 def load_pretrained_npy(faster_rcnn_model, fname):
