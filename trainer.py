@@ -5,6 +5,7 @@ import torch
 
 import cfgs.config as cfg  # make a common config file
 import os
+import sys
 # import numpy as np
 # import datetime
 
@@ -63,7 +64,7 @@ def arg_parse():
                         default="4", type=int)
     parser.add_argument("-b", dest="batch", help="Batch size", default=30, type=int)
 
-    parser.add_argument("-tl", dest='transfer', help='transfer_learning', default=True, type=bool)
+    parser.add_argument("-tl", dest='transfer', help='transfer_learning', default=False, type=bool)
     # parser.add_argument("--confidence", dest = "confidence", help = "Object Confidence to filter predictions", default = 0.5)
     # parser.add_argument("--nms_thresh", dest = "nms_thresh", help = "NMS Threshhold", default = 0.4)
     parser.add_argument("-c", dest='cfgfile', help="Config file",
@@ -82,9 +83,6 @@ def arg_parse():
 
 
 if __name__ == '__main__':
-    path = os.path.join(cfg.TRAIN_DIR, 'runs', str(round(time.time())))
-    if not os.path.exists(path):
-        os.makedirs(path)
 
     args = arg_parse()
     lmdb = 1
@@ -99,19 +97,23 @@ if __name__ == '__main__':
         dataset = dset(cfg.target_file, cfg.root_dir, cfg.multi_scale_inp_size, cfg.transforms)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch, shuffle=True, num_workers=args.workers)
         # currently contains dict with keys : 'image' and 'targets'
-
-    net = Darknet()
+    classes = 20 if args.transfer else 4
+    net = Darknet(classes)
     # net.to('cuda')
 
     # with open(args.cfgfile, 'r') as config:
     #     cfg = config
 
     # load from a checkpoint
-    if False:
-        net.load_from_npz(cfg.pretrained_model, num_conv=18)  # doubts
+    if args.transfer:
+        net.load_from_npz(cfg.pretrained_model, num_conv=18)
+        exp_name = str(round(time.time()))  # For tensorboard consistency on reloads
+    else:
+        exp_name = net_utils.load_net(cfg.trained_model, net)
 
-    # net = torch.nn.DataParallel(net, device_ids=range(torch.cuda.device_count()))
-
+    path = os.path.join(cfg.TRAIN_DIR, 'runs', exp_name)
+    if not os.path.exists(path):
+        os.makedirs(path)
     # If transfer flag
     if args.transfer:
         for params in net.parameters():
@@ -121,7 +123,7 @@ if __name__ == '__main__':
         net.conv5 = new_layer  # make it generalizable
         # print(shape)
         print('Tranfer Learning Active')
-    net = net.cuda()
+    # net = net.cuda()
     # os.environ['CUDA_VISIBLE_DEVICES'] = 0, 1, 2
     # torch.cuda.manual_seed(seed)
     # net = torch.nn.DataParallel(net).cuda()
@@ -132,10 +134,11 @@ if __name__ == '__main__':
     # Optimizer
     start_epoch = 0
     lr = cfg.init_learning_rate
-    if args.transfer:
-        optimizable = net.conv5.parameters
-    else:
-        optimizable = net.parameters
+
+    optimizable = net.conv5.parameters  # this is always the case whether transfer or not
+
+    net.cuda()
+    # net = torch.nn.DataParallel(net, device_ids=list(range(torch.cuda.device_count())))
 
     optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
     optimizer.zero_grad()
@@ -178,8 +181,8 @@ if __name__ == '__main__':
                 im = net_utils.np_to_variable(im,
                                               is_cuda=True,
                                               volatile=False).permute(0, 3, 1, 2)
-            except:
-                continue
+            except TypeError:
+                sys.exit(1)
 
             bbox_pred, iou_pred, prob_pred = net(im, gt_boxes=gt_boxes, gt_classes=gt_classes, dontcare=dontcare, size_index=size_index)
             # print(im, gt_boxes, gt_classes, dontcare, size_index)
@@ -232,7 +235,7 @@ if __name__ == '__main__':
 
             save_name = os.path.join(cfg.train_output_dir,
                                      '{}_{}.h5'.format(cfg.exp_name, epoch))
-            net_utils.save_net(save_name, net)
+            net_utils.save_net(exp_name, save_name, net)
             print(('save model: {}'.format(save_name)))
         step_cnt = 0
         epoch += 1

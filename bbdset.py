@@ -179,7 +179,7 @@ class dataset(data.Dataset):
         self.batch['gt_classes'][ith] = classes
         self.batch['dontcare'][ith] = dontcare
         self.batch['origin_im'][ith] = origin_im
-
+        return 0
     # def to_tensor(self):
     #     sample = self.batch
     #     # swap color axis because

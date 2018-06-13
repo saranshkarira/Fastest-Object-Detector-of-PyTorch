@@ -142,7 +142,7 @@ def _process_batch(data, size_index):
 
 
 class Darknet19(nn.Module):
-    def __init__(self):
+    def __init__(self, classes):
         super(Darknet19, self).__init__()
 
         net_cfgs = [
@@ -174,7 +174,7 @@ class Darknet19(nn.Module):
         self.conv4, c4 = _make_layers((c1 * (stride * stride) + c3), net_cfgs[7])
 
         # linear
-        out_channels = cfg.num_anchors * (20 + 5)
+        out_channels = cfg.num_anchors * (classes + 5)
         self.conv5 = net_utils.Conv2d(c4, out_channels, 1, 1, relu=False)
         self.global_average_pool = nn.AvgPool2d((1, 1))
 

@@ -61,9 +61,10 @@ class FC(nn.Module):
 # Non pep8 to import h5py this way
 
 
-def save_net(fname, net):
+def save_net(exp_name, fname, net):
     import h5py  # Opening file in write mode/Creating one
     h5f = h5py.File(fname, mode='w')
+    h5f.create_dataset('exp_name', data=exp_name)
     for k, v in list(net.state_dict().items()):
         h5f.create_dataset(k, data=v.cpu().numpy())  # writing dataset with k as keyname and v after converting
         # it to cpu and numpy array
@@ -75,6 +76,7 @@ def load_net(fname, net):
     for k, v in list(net.state_dict().items()):
         param = torch.from_numpy(np.asarray(h5f[k]))
         v.copy_(param)
+    return h5f['exp_name']
 
 
 def load_pretrained_npy(faster_rcnn_model, fname):
