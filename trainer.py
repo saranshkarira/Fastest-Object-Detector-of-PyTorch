@@ -108,8 +108,10 @@ if __name__ == '__main__':
     if args.transfer:
         net.load_from_npz(cfg.pretrained_model, num_conv=18)
         exp_name = round(time.time())  # For tensorboard consistency on reloads
+        start_epoch = 0
+        lr = cfg.init_learning_rate
     else:
-        exp_name = net_utils.load_net(cfg.trained_model, net)[0]
+        exp_name, start_epoch, lr = net_utils.load_net(cfg.trained_model, net)
 
     path = os.path.join(cfg.TRAIN_DIR, 'runs', str(exp_name))
     if not os.path.exists(path):
@@ -132,8 +134,6 @@ if __name__ == '__main__':
     print('network loaded')
 
     # Optimizer
-    start_epoch = 0
-    lr = cfg.init_learning_rate
 
     optimizable = net.conv5.parameters  # this is always the case whether transfer or not
 
@@ -235,7 +235,7 @@ if __name__ == '__main__':
 
             save_name = os.path.join(cfg.train_output_dir,
                                      '{}_{}.h5'.format(cfg.exp_name, epoch))
-            net_utils.save_net(exp_name, save_name, net)
+            net_utils.save_net(exp_name, step, lr, save_name, net)
             print(('save model: {}'.format(save_name)))
         step_cnt = 0
         epoch += 1

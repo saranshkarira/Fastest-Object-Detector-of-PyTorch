@@ -61,10 +61,10 @@ class FC(nn.Module):
 # Non pep8 to import h5py this way
 
 
-def save_net(exp_name, fname, net):
+def save_net(exp_name, epoch, lr, fname, net):
     import h5py  # Opening file in write mode/Creating one
     h5f = h5py.File(fname, mode='w')
-    h5f.create_dataset('exp_name', data=np.array([exp_name]))
+    h5f.create_dataset('exp_params', data=np.array([exp_name, epoch, lr]))
     for k, v in list(net.state_dict().items()):
         h5f.create_dataset(k, data=v.cpu().numpy())  # writing dataset with k as keyname and v after converting
         # it to cpu and numpy array
@@ -73,7 +73,7 @@ def save_net(exp_name, fname, net):
 def load_net(fname, net):
     import h5py
     h5f = h5py.File(fname, mode='r')  # mode 'r' opens the file in read mode
-    print(str(h5f['exp_name']), 'I am the god of thunder')
+    # print(str(h5f['exp_name']), 'I am the god of thunder')
     for k, v in list(net.state_dict().items()):
         param = torch.from_numpy(np.asarray(h5f[k]))
         v.copy_(param)
