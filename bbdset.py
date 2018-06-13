@@ -13,7 +13,7 @@ from skimage import transform as sktransform
 import json
 import lmdb
 # from datasets.imdb import ImageDataset
-import pickle
+# import pickle
 from utils.im_transform import imcv2_affine_trans, imcv2_recolor
 import threading
 # import torchvision.transforms
@@ -38,10 +38,9 @@ class dataset(data.Dataset):
         self.transform = transforms
         self.env = lmdb.open(root_dir, max_readers=1, readonly=True, lock=False, readahead=False, meminit=False)
         self.txn = self.env.begin(write=False)
-        with self.txn.cursor() as cursor:
-            self.length = self.txn.stat()['entries'] - 1  # for mapping
-            # mapping = cursor.get('mapping')
-            # self.mapping = pickle.loads(mapping)  # mapping.decode('base64', 'strict'))
+        self.length = self.txn.stat()['entries'] - 4  # for mapping
+        # mapping = cursor.get('mapping')
+        # self.mapping = pickle.loads(mapping)  # mapping.decode('base64', 'strict'))
         classes = None
         if classes is None:
             self._classes = {'Weapon', 'Vehicle', 'Building', 'Person'}
@@ -113,14 +112,15 @@ class dataset(data.Dataset):
 
             if k == 'Var1':
                 image_id = v.split('/')[-1].encode()
-            # elif len(v) == 0:
-            #     pass
 
-            elif len(v) != 0 and isinstance(v[0], (int)):
+            elif len(v) == 0:
+                pass
+
+            elif isinstance(v[0], (int)):
                 gt_boxes.append(v)
                 gt_classes.append(self.class_map[k])
 
-            elif len(v) != 0 and isinstance(v[0], (list)):
+            elif isinstance(v[0], (list)):
                 for anns in v:
                     gt_boxes.append(anns)
                     gt_classes.append(self.class_map[k])
