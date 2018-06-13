@@ -22,7 +22,7 @@ def converter(output_path):
     counter = 0
     joker = os.listdir('/home/akhilesh/Packages/Pytorch/data/FourClass_JPG/train/Weapon_JPG')
     joker.sort()
-    dicto = {}
+    # dicto = {}
     # for i in range(len(joker)):
     # 	dict[i] = joker[i]
     for image_name in joker:

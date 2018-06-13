@@ -111,8 +111,10 @@ if __name__ == '__main__':
         start_epoch = 0
         lr = cfg.init_learning_rate
     else:
-        exp_name, start_epoch, lr = net_utils.load_net(cfg.trained_model, net)
-
+        if os.path.exists(cfg.trained_model):
+            exp_name, start_epoch, lr = net_utils.load_net(cfg.trained_model, net)
+        else:
+            print('no checkpoint to load from')
     path = os.path.join(cfg.TRAIN_DIR, 'runs', str(exp_name))
     if not os.path.exists(path):
         os.makedirs(path)
@@ -138,7 +140,7 @@ if __name__ == '__main__':
     optimizable = net.conv5.parameters  # this is always the case whether transfer or not
 
     net.cuda()
-    # net = torch.nn.DataParallel(net, device_ids=list(range(torch.cuda.device_count())))
+    # net = torch.nn.DataParallel(net, device_sids=list(range(torch.cuda.device_count())))
 
     optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
     optimizer.zero_grad()
@@ -177,12 +179,11 @@ if __name__ == '__main__':
             origin_im = ['origin_im']
             # print(cnt, 'I am working')
             # forward
-            try:
-                im = net_utils.np_to_variable(im,
-                                              is_cuda=True,
-                                              volatile=False).permute(0, 3, 1, 2)
-            except TypeError:
-                sys.exit(1)
+            im = net_utils.np_to_variable(im,
+                                          is_cuda=True,
+                                          volatile=False).permute(0, 3, 1, 2)
+            # except TypeError:
+            #     sys.exit(1)
 
             bbox_pred, iou_pred, prob_pred = net(im, gt_boxes=gt_boxes, gt_classes=gt_classes, dontcare=dontcare, size_index=size_index)
             # print(im, gt_boxes, gt_classes, dontcare, size_index)

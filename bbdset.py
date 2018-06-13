@@ -209,7 +209,7 @@ class dataset(data.Dataset):
             ths[ith].join()
         # x = [(x.shape) for x in self.batch['gt_boxes']]
         # print(np.asarray(self.batch['gt_boxes']).shape, 'goda')
-        self.batch['images'] = np.asarray(self.batch['images'])
+        self.batch['images'] = np.asarray(self.batch['images'], dtype=np.float32)
         # self.batch['gt_boxes'] = self.batch['gt_boxes']
         # self.batch = self.to_tensor()
         return self.batch
