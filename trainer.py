@@ -107,7 +107,7 @@ if __name__ == '__main__':
     # load from a checkpoint
     if args.transfer:
         net.load_from_npz(cfg.pretrained_model, num_conv=18)
-        exp_name = int(time.time())  # For tensorboard consistency on reloads
+        exp_name = str(int(time.time()))  # For tensorboard consistency on reloads
         start_epoch = 0
         j = 0
         lr = cfg.init_learning_rate
@@ -115,6 +115,8 @@ if __name__ == '__main__':
         path_t = cfg.trained_model()
         if os.path.exists(path_t):
             j, exp_name, start_epoch, lr = net_utils.load_net(path_t, net)
+            j, exp_name, start_epoch, lr = int(j), str(int(exp_name)), int(start_epoch), float(lr)
+            print('lr is {} and its type is {}'.format(lr, type(lr)))
         else:
             e = 'no checkpoint to load from\n'
             sys.exit(e)
@@ -234,17 +236,17 @@ if __name__ == '__main__':
         size_index = randint(0, len(cfg.multi_scale_inp_size) - 1)
 
         # and (step % batch_per_epoch == 0): since this only runs when an epoch is complete
-        if step % cfg.lr_decay_epochs == 0:
+        if step % cfg.lr_decay_epochs == 1:
             lr *= cfg.lr_decay
             optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
 
-        train_output_dir = os.path.join(cfg.TRAIN_DIR, 'checkpoints', str(exp_name))
+        train_output_dir = os.path.join(cfg.TRAIN_DIR, 'checkpoints', exp_name)
         cfg.mkdir(train_output_dir, max_depth=3)
         save_name = os.path.join(train_output_dir, '{}.h5'.format(step))
         net_utils.save_net(j, exp_name, step + 1, lr, save_name, net)
         print(('save model: {}'.format(save_name)))
 
-        if step % 10 == 0:
+        if step % 10 == 1:
             cfg.clean_ckpts(train_output_dir)
 
         step_cnt = 0
