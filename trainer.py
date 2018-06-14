@@ -86,17 +86,17 @@ if __name__ == '__main__':
 
     args = arg_parse()
     lmdb = 1
-    # Use LMDB or not
-    if lmdb == 0:
-        image_data = torchvision.datasets.ImageFolder(args.path)
-        data_loader = torch.utils.data.DataLoader(image_data, batch_size=args.batch, shuffle=True, num_workers=args.workers, multiscale=cfg.multi_scale_inp_size)
-        # load the annotations
 
-    else:
-        # custom dataset pipeline with LMDB
+    # Use LMDB or not
+    if cfg.lmdb:
         dataset = dset(cfg.target_file, cfg.root_dir, cfg.multi_scale_inp_size, cfg.transforms)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch, shuffle=True, num_workers=args.workers)
-        # currently contains dict with keys : 'image' and 'targets'
+
+    else:
+
+        image_data = torchvision.datasets.ImageFolder(args.path)
+        data_loader = torch.utils.data.DataLoader(image_data, batch_size=args.batch, shuffle=True, num_workers=args.workers, multiscale=cfg.multi_scale_inp_size)
+
     classes = 20 if args.transfer else 4
     net = Darknet(classes)
     # net.to('cuda')
@@ -107,14 +107,18 @@ if __name__ == '__main__':
     # load from a checkpoint
     if args.transfer:
         net.load_from_npz(cfg.pretrained_model, num_conv=18)
-        exp_name = round(time.time())  # For tensorboard consistency on reloads
+        exp_name = int(time.time())  # For tensorboard consistency on reloads
         start_epoch = 0
+        j = 0
         lr = cfg.init_learning_rate
     else:
-        if os.path.exists(cfg.trained_model):
-            exp_name, start_epoch, lr = net_utils.load_net(cfg.trained_model, net)
+        path_t = cfg.trained_model()
+        if os.path.exists(path_t):
+            j, exp_name, start_epoch, lr = net_utils.load_net(path_t, net)
         else:
-            print('no checkpoint to load from')
+            e = 'no checkpoint to load from\n'
+            sys.exit(e)
+
     path = os.path.join(cfg.TRAIN_DIR, 'runs', str(exp_name))
     if not os.path.exists(path):
         os.makedirs(path)
@@ -158,8 +162,8 @@ if __name__ == '__main__':
     size_index = 0
     t = Timer()
     epoch = start_epoch
-    j = 0
-    for step in range(int(start_epoch), cfg.max_epoch):
+
+    for step in range(int(epoch), cfg.max_epoch):
         # batman = [v for k, v in enumerate(dataloader)]
 
         # batch
@@ -211,7 +215,7 @@ if __name__ == '__main__':
 
                 print(('epoch %d[%d/%d], loss: %.3f, bbox_loss: %.3f, iou_loss: %.3f, '
                        'cls_loss: %.3f (%.2f s/batch, rest:%s)' %
-                       (epoch, step_cnt, batch_per_epoch, train_loss, bbox_loss,
+                       (step, step_cnt, batch_per_epoch, train_loss, bbox_loss,
                         iou_loss, cls_loss, duration,
                         str(datetime.timedelta(seconds=int((batch_per_epoch - step_cnt) * duration))))))
 
@@ -229,14 +233,15 @@ if __name__ == '__main__':
 
         size_index = randint(0, len(cfg.multi_scale_inp_size) - 1)
 
-        if step > 0:  # and (step % batch_per_epoch == 0): since this only runs when an epoch is complete
-            if epoch % cfg.lr_decay_epochs == 0:
-                lr *= cfg.lr_decay
-                optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
+        # and (step % batch_per_epoch == 0): since this only runs when an epoch is complete
+        if step % cfg.lr_decay_epochs == 0:
+            lr *= cfg.lr_decay
+            optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
 
-            save_name = os.path.join(cfg.train_output_dir,
-                                     '{}_{}.h5'.format(cfg.exp_name, epoch))
-            net_utils.save_net(exp_name, step + 1, lr, save_name, net)
-            print(('save model: {}'.format(save_name)))
+        train_output_dir = os.path.join(cfg.TRAIN_DIR, 'checkpoints', str(exp_name))
+        cfg.mkdir(train_output_dir, max_depth=3)
+        save_name = os.path.join(train_output_dir, '{}.h5'.format(step))
+        net_utils.save_net(j, exp_name, step + 1, lr, save_name, net)
+        print(('save model: {}'.format(save_name)))
+
         step_cnt = 0
-        epoch += 1

@@ -76,12 +76,25 @@ target_file = os.path.join(ROOT_DIR, 'db', 'targets', '*.json')
 target_file = glob.glob(target_file)[0]
 transforms = False
 
-trained_model = sorted(glob.glob(os.path.join(TRAIN_DIR, exp_name, '*.h5')))[-1]
+
+def trained_model():
+    exp_name = str(sorted([int(i.split('/')[-1]) for i in glob.glob(os.path.join(TRAIN_DIR, 'checkpoints', '*'))])[-1])
+    trained_model = glob.glob(os.path.join(TRAIN_DIR, 'checkpoints', exp_name, '*.h5'))
+    split_key = []
+    split_dict = {}
+    for elements in trained_model:
+        jamba = int((elements.split('/')[-1]).split('.')[0])
+        split_key.append(jamba)
+        split_dict[jamba] = elements
+
+    return split_dict[sorted(split_key)[-1]]
+
+
 pretrained_model = glob.glob(os.path.join(MODEL_DIR, '*.npz'))[0]
 
-train_output_dir = os.path.join(TRAIN_DIR, exp_name)
+# train_output_dir = os.path.join(TRAIN_DIR, exp_name)
 test_output_dir = os.path.join(TEST_DIR, imdb_test, h5_fname)
-mkdir(train_output_dir, max_depth=3)
+
 # mkdir(test_output_dir, max_depth=4)
 
 rand_seed = 1024
@@ -89,3 +102,5 @@ use_tensorboard = True
 
 log_interval = 10
 disp_interval = 10
+
+lmdb = 1
