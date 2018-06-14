@@ -244,4 +244,7 @@ if __name__ == '__main__':
         net_utils.save_net(j, exp_name, step + 1, lr, save_name, net)
         print(('save model: {}'.format(save_name)))
 
+        if step % 10 == 0:
+            cfg.clean_ckpts(train_output_dir)
+
         step_cnt = 0

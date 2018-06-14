@@ -90,6 +90,16 @@ def trained_model():
     return split_dict[sorted(split_key)[-1]]
 
 
+def clean_ckpts(train_dir):
+    ckpts = dict(map(lambda x: (int(x.split('/')[-1].split('.')[0]), x), glob.glob(os.path.join(train_dir, '*'))))
+    samba = sorted(ckpts.keys())
+    samba = samba[:(len(samba) - 4)]
+    for key in samba:
+        os.remove(ckpts[key])
+    # just to ensure we hit the jackpot
+    print('remaining checkpoints are {}'.format(map(lambda x: x.split('/')[-1], glob.glob(os.path.join(train_dir, '*')))))
+
+
 pretrained_model = glob.glob(os.path.join(MODEL_DIR, '*.npz'))[0]
 
 # train_output_dir = os.path.join(TRAIN_DIR, exp_name)
