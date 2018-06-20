@@ -144,8 +144,9 @@ if __name__ == '__main__':
     # Optimizer
 
     optimizable = net.conv5.parameters  # this is always the case whether transfer or not
-
     net.cuda()
+    net = torch.nn.DataParallel(net)
+
     # net = torch.nn.DataParallel(net, device_sids=list(range(torch.cuda.device_count())))
 
     optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)

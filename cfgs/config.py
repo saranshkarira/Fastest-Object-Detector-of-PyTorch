@@ -3,9 +3,9 @@ from .config_vmr import *  # noqa
 from .exps.darknet19_exp1 import *  # noqa
 import glob
 
-# import per experiments based parameters
 
 
+# creates non existing directories
 def mkdir(path, max_depth=3):
     parent, child = os.path.split(path)
     if not os.path.exists(parent) and max_depth > 1:
@@ -76,7 +76,7 @@ target_file = os.path.join(ROOT_DIR, 'db', 'targets', '*.json')
 target_file = glob.glob(target_file)[0]
 transforms = False
 
-
+# gets the latest file from the latest experiment and returns its abs path
 def trained_model():
     exp_name = str(sorted([int(i.split('/')[-1]) for i in glob.glob(os.path.join(TRAIN_DIR, 'checkpoints', '*'))])[-1])
     trained_model = glob.glob(os.path.join(TRAIN_DIR, 'checkpoints', exp_name, '*.h5'))
@@ -90,16 +90,19 @@ def trained_model():
     return split_dict[sorted(split_key)[-1]]
 
 
+# Cleans all checkpoint except latest n no, n =  remain
 def clean_ckpts(train_dir):
+    remain = 4
     ckpts = dict(map(lambda x: (int(x.split('/')[-1].split('.')[0]), x), glob.glob(os.path.join(train_dir, '*'))))
     samba = sorted(ckpts.keys())
-    samba = samba[:(len(samba) - 4)]
+    samba = samba[:(len(samba) - remain)]
     for key in samba:
         os.remove(ckpts[key])
     # just to ensure we hit the jackpot
     print('remaining checkpoints are {}'.format(map(lambda x: x.split('/')[-1], glob.glob(os.path.join(train_dir, '*')))))
 
 
+# get the pretrained model(The one we apply transfer learning on)
 pretrained_model = glob.glob(os.path.join(MODEL_DIR, '*.npz'))[0]
 
 # train_output_dir = os.path.join(TRAIN_DIR, exp_name)
