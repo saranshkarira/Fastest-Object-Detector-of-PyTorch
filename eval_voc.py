@@ -43,10 +43,58 @@ def voc_eval(detpath, annopath, classname, cachedir, ovthresh=0.5, use_07_metric
         os.mkdir(cachedir)
     cachedir = os.path.join(cachedir, 'annots.pkl')
 
-    with open(annopath) as opener:
-        annots = json.load(opener)
+    if not os.path.exists(cachedir):
+
+        with open(annopath) as opener:
+            annots = json.load(opener)
+
+        for i in annots:
+            gt_boxes = []
+            gt_classes = []
+            imagenames = []
+            for k, v in i.iteritems():
+                if k == 'Var1':
+                    img = v.split('/')[-1].encode()
+
+                elif k == classname:
+
+                    if len(v) == 0:
+                        pass
+
+                    elif isinstance(v[0], (int)):
+                        gt_boxes.append(v)
+                        gt_classes.append(class_map[k])
+
+                    elif isinstance(v[0], (list)):
+                        for anns in v:
+                            gt_boxes.append(anns)
+                            gt_classes.append(class_map[k])
+            imagenames.append(img)
+            recs[img] = {'gt_boxes': gt_boxes, 'gt_classes' : gt_classes}
+        with open(cachefile, 'wb') as f:
+            pickle.dump(recs, f)
+    else:
+        with open(cachefile, 'rb') as f:
+            recs = pickle.load(f)
+
+    # filter by class:
+    class_recs = {}
+
+        # seq = np.asarray(range(nd))
+        # off = np.ones(nd)
+        # tpfn = seq+off
+        tpfn = 0
+    for imagename in imagenames:
+
+        bbox = np.array(list(filter(lambda x: recs[imagename]['gt_boxes'] if recs[imagename]['gt_classes'] == class_map[classname] else False , recs[imagename]['gt_boxes'])))
+
+
+        det = [False]*bbox.shape(0)
+        tpfn += sum(~np.ones(bbox.shape(0)))
+        class_recs[imagename] =  {'bbox':bbox, 'det':det}
     # Open detection, and annotation and then calculate precision recall
     detfile = detpath.format(classname)
+
     with open(detfile, 'r') as f:
         lines = f.readlines()
     if any(lines) == 1:
@@ -65,6 +113,8 @@ def voc_eval(detpath, annopath, classname, cachedir, ovthresh=0.5, use_07_metric
         nd = len(image_ids)
         tp = np.zeros(nd)
         fp = np.zeros(nd)
+
+
         for d in range(nd):
             R = class_recs[image_ids[d]]
             bb = BB[d, :].astype(float)
@@ -82,26 +132,39 @@ def voc_eval(detpath, annopath, classname, cachedir, ovthresh=0.5, use_07_metric
                 inters = iw * ih
 
                 # Union
-                uni = ((bb[2] - bb[0] + 1.) * (bb[3] - bb[1] + 1.))
+                uni = ((bb[2] - bb[0] + 1.) * (bb[3] - bb[1] + 1.) +
+                       (BBGT[:, 2] - BBGT[:, 0] + 1.) *
+                       (BBGT[:, 3] - BBGT[:, 1] + 1.) - inters)
 
-    for i in annots:
-        gt_boxes = []
-        gt_classes = []
-        for k, v in i.iteritems():
-            if k == 'Var1':
-                image_id = v.split('/')[-1].encode()
-            elif k == classname:
+                overlaps = inters / uni
+                ovmax = np.max(overlaps)
+                jmax = np.argmax(overlaps)
 
-                if len(v) == 0:
-                    pass
 
-                elif isinstance(v[0], (int)):
-                    gt_boxes.append(v)
-                    gt_classes.append(class_map[k])
+            if ovmax > ovthresh:
+                if not R['det'][jmax]:
+                    tp[d] = 1
+                    R['det'][jmax] = 1
 
-                elif isinstance(v[0], (list)):
-                    for anns in v:
-                        gt_boxes.append(anns)
-                        gt_classes.append(class_map[k])
+                else:
+                    fp[d] = 1
 
-        a
+            else: 
+                fp[d] = 1
+
+        fp = np.cumsum(fp)
+        tp = np.cumsum(tp)
+        rec = tp / float(tpfn)
+
+        prec = tp/ np.maximum(tp+fp, np.finfo(np.float64).eps)
+        ap = voc_ap(rec, prec, use_07_metric)
+
+    else:
+        rec = -1
+        prec = -1
+        ap = -1
+
+    return rec, prec, ap
+
+
+        
