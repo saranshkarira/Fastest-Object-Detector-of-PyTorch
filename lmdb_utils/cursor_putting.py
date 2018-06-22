@@ -20,15 +20,13 @@ def converter(output_path):
     env = lmdb.open(output_path, map_size=9959123412)
     batch = []
     counter = 0
-    joker = os.listdir('/home/akhilesh/Packages/Pytorch/data/FourClass_JPG/train/Weapon_JPG')
+    joker = os.listdir(input_path)
     joker.sort()
-    # dicto = {}
-    # for i in range(len(joker)):
-    # 	dict[i] = joker[i]
+
     for image_name in joker:
         print(counter)
         # image_name = "image" + str(counter) + ".jpg"
-        image_path = "/home/akhilesh/Packages/Pytorch/data/FourClass_JPG/train/Weapon_JPG/" + image_name
+        image_path = os.path.join(input_path, image_name)
         if not os.path.isfile(image_path):
             print("{} is not a file".format(image_name))
             # counter += 1
@@ -68,5 +66,6 @@ def converter(output_path):
 
 
 if __name__ == '__main__':
+    input_path = sys.argv[2]
     output_path = sys.argv[1]
-    converter(output_path)
+    converter(output_path, input_path)

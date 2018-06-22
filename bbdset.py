@@ -55,7 +55,7 @@ class dataset(data.Dataset):
         self._salt = str()
         self.dst_size = multiscale
         self.sample = {'image': [], 'gt_boxes': [], 'gt_classes': [], 'dontcare': []}
-# len
+    # len
 
     def __len__(self):
 
@@ -84,13 +84,13 @@ class dataset(data.Dataset):
         boxes[:, 3::4] = np.maximum(np.minimum(boxes[:, 3::4], im_shape[0] - 1), 0)
         return boxes
 
-    def _offset_boxes(self, boxes, im_shape, scale, offs, flip):
+    def _offset_boxes(self, boxes, im_shape, flip):
         if len(boxes) == 0:
             return boxes
         boxes = np.asarray(boxes, dtype=np.float)
-        boxes *= scale
-        boxes[:, 0::2] -= offs[0]
-        boxes[:, 1::2] -= offs[1]
+        # boxes *= scale
+        # boxes[:, 0::2] -= offs[0]
+        # boxes[:, 1::2] -= offs[1]
         boxes = self.clip_boxes(boxes, im_shape)
 
         if flip:
@@ -140,12 +140,11 @@ class dataset(data.Dataset):
         # do it above image as this is lower cost op, this will reduce lock convoy and make it concurrent if possible
 
         ori_im = np.copy(im)
-        # print(im.shape)
         im, trans_param = imcv2_affine_trans(im)
 
         # analyse the below twos
         scale, offs, flip = trans_param
-        gt_boxes = np.asarray(self._offset_boxes(gt_boxes, im.shape, scale, offs, flip))
+        gt_boxes = np.asarray(self._offset_boxes(gt_boxes, im.shape, flip))
 
         if inp_size is not None:  # bbox axis is flipped from the image axis, or is it??
             w, h = inp_size
@@ -164,8 +163,8 @@ class dataset(data.Dataset):
         # im /= 255.
 
         # im = imcv2_recolor(im)
-        # h, w = inp_size
-        # im = cv2.resize(im, (w, h))
+        w, h = inp_size
+        im = cv2.resize(im, (h, w))
         # im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         # im /= 255
         # gt_boxes = np.asarray(boxes, dtype=np.int)

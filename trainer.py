@@ -9,13 +9,6 @@ import sys
 # import numpy as np
 # import datetime
 
-# try:
-#     from pycrayon import CrayonClient
-# except ImportError:
-#     CrayonClient = None
-
-# # from datasets.pascal_voc import VOCDataset
-
 # import utils.yolo as yolo_utils
 import utils.network as net_utils  # THEY HAVE ALTERNATES
 
@@ -35,12 +28,8 @@ except ImportError:
 
 from bbdset import dataset as dset
 import time
-# from torch.autograd import Variable
 
-# #########FUNCTIONS#################
-# Pending
-# Loading from a checkpoint
-# parsing the target dictionaries
+
 
 
 # def torch_to_variable(x, is_cuda=True, dtype=torch.FloatTensor, volatile=False):
@@ -65,19 +54,11 @@ def arg_parse():
     parser.add_argument("-b", dest="batch", help="Batch size", default=30, type=int)
 
     parser.add_argument("-tl", dest='transfer', help='transfer_learning', default=False, type=bool)
-    # parser.add_argument("--confidence", dest = "confidence", help = "Object Confidence to filter predictions", default = 0.5)
-    # parser.add_argument("--nms_thresh", dest = "nms_thresh", help = "NMS Threshhold", default = 0.4)
+    
     parser.add_argument("-c", dest='cfgfile', help="Config file",
                         default="cfg/yolov3.cfg", type=str)
     parser.add_argument("-t", dest="use_tensorboard", help="Disable tensorboard", default=True, type=bool)
-    # parser.add_argument("--weights", dest = 'weightsfile', help =
-    #                     "weightsfile",
-    #                     default = "yolov3.weights", type = str)
-    # parser.add_argument("--reso", dest = 'reso', help =
-    #                     "Input resolution of the network. Increase to increase accuracy. Decrease to increase speed",
-    #                     default = "320", type = str)
-    # parser.add_argument("--scales", dest = "scales", help = "Scales to use for detection",
-    #                     default = "1,2,3", type = str)
+
 
     return parser.parse_args()
 
@@ -101,8 +82,6 @@ if __name__ == '__main__':
     net = Darknet(classes)
     # net.to('cuda')
 
-    # with open(args.cfgfile, 'r') as config:
-    #     cfg = config
 
     # load from a checkpoint
     if args.transfer:
@@ -111,6 +90,7 @@ if __name__ == '__main__':
         start_epoch = 0
         j = 0
         lr = cfg.init_learning_rate
+        
     else:
         path_t = cfg.trained_model()
         if os.path.exists(path_t):
@@ -167,35 +147,26 @@ if __name__ == '__main__':
     epoch = start_epoch
 
     for step in range(int(epoch), cfg.max_epoch):
-        # batman = [v for k, v in enumerate(dataloader)]
+
         size_index = randint(0, len(cfg.multi_scale_inp_size) - 1)
         print('new scale is {}'.format(cfg.multi_scale_inp_size[size_index]))
         # batch
         for i, batch_of_index in enumerate(dataloader):
             t.tic()
-            # batch = iter(dataloader).next()
-            # batch = batch[batch_index]
-            # im = [i[0]['image'] for i in batch]
-            # gt_boxes = [i[0]['gt_boxes'] for i in batch]
-            # gt_classes = [i[0]['gt_classes'] for i in batch]
-            # dontcare = [i[0]['dontcare'] for i in batch]
+
             batch = dataset.fetch_parse(batch_of_index, size_index)
             im = batch['images']
             gt_boxes = batch['gt_boxes']
             gt_classes = batch['gt_classes']
             dontcare = batch['dontcare']
             origin_im = ['origin_im']
-            # print(cnt, 'I am working')
-            # forward
+
             im = net_utils.np_to_variable(im,
                                           is_cuda=True,
                                           volatile=False).permute(0, 3, 1, 2)
-            # except TypeError:
-            #     sys.exit(1)
 
             bbox_pred, iou_pred, prob_pred = net(im, gt_boxes=gt_boxes, gt_classes=gt_classes, dontcare=dontcare, size_index=size_index)
-            # print(im, gt_boxes, gt_classes, dontcare, size_index)
-            # backward
+
             loss = net.loss
             bbox_loss += net.bbox_loss.data.cpu().numpy()[0]
             iou_loss += net.iou_loss.data.cpu().numpy()[0]
@@ -209,9 +180,9 @@ if __name__ == '__main__':
             step_cnt += 1
             j += 1
             duration = t.toc()
-            # print(step, cfg.disp_interval)
+
             if cnt % cfg.disp_interval == 0:
-                # print('I am visiting india')
+
                 train_loss /= cnt
                 bbox_loss /= cnt
                 iou_loss /= cnt
@@ -233,9 +204,8 @@ if __name__ == '__main__':
                 bbox_loss, iou_loss, cls_loss = 0., 0., 0.
                 cnt = 0
                 t.clear()
-        # print('i break here')
 
-        # and (step % batch_per_epoch == 0): since this only runs when an epoch is complete
+
         if step % cfg.lr_decay_epochs == 1:
             lr *= cfg.lr_decay
             optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
