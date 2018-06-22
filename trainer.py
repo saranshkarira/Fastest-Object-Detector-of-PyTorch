@@ -26,7 +26,7 @@ try:
 except ImportError:
     SummaryWriter = None
 
-from bbdset import dataset as dset
+from dataset import dataset as dset
 import time
 
 
@@ -125,7 +125,7 @@ if __name__ == '__main__':
 
     optimizable = net.conv5.parameters  # this is always the case whether transfer or not
     net.cuda()
-    net = torch.nn.DataParallel(net)
+    # net = torch.nn.DataParallel(net)
 
     # net = torch.nn.DataParallel(net, device_sids=list(range(torch.cuda.device_count())))
 
