@@ -1,22 +1,18 @@
-# """YOLO V3 TRAINING MODULE"""
-# import os
 import torch
 
 
 import cfgs.config as cfg  # make a common config file
 import os
 import sys
-# import numpy as np
-# import datetime
 
-# import utils.yolo as yolo_utils
+
 import utils.network as net_utils  # THEY HAVE ALTERNATES
 
 import datetime
 from darknet import Darknet19 as Darknet
 from utils.timer import Timer
 from random import randint
-# import numpy as np
+
 
 import torchvision
 import argparse
@@ -28,15 +24,6 @@ except ImportError:
 
 from dataset import dataset as dset
 import time
-
-
-
-
-# def torch_to_variable(x, is_cuda=True, dtype=torch.FloatTensor, volatile=False):
-#     v = torch.autograd.Variable(x.type(dtype), volatile=volatile)
-#     if is_cuda:
-#         v = v.cuda()
-#     return v
 
 
 def arg_parse():
@@ -54,11 +41,10 @@ def arg_parse():
     parser.add_argument("-b", dest="batch", help="Batch size", default=30, type=int)
 
     parser.add_argument("-tl", dest='transfer', help='transfer_learning', default=False, type=bool)
-    
+
     parser.add_argument("-c", dest='cfgfile', help="Config file",
                         default="cfg/yolov3.cfg", type=str)
     parser.add_argument("-t", dest="use_tensorboard", help="Disable tensorboard", default=True, type=bool)
-
 
     return parser.parse_args()
 
@@ -70,7 +56,7 @@ if __name__ == '__main__':
 
     # Use LMDB or not
     if cfg.lmdb:
-        dataset = dset(cfg.target_file, cfg.root_dir, cfg.multi_scale_inp_size, cfg.transforms)
+        dataset = dset(cfg.target_file, cfg.root_dir, cfg.multi_scale_inp_size)  # , cfg.transforms)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch, shuffle=True, num_workers=args.workers)
 
     else:
@@ -80,8 +66,6 @@ if __name__ == '__main__':
 
     classes = 20 if args.transfer else 4
     net = Darknet(classes)
-    # net.to('cuda')
-
 
     # load from a checkpoint
     if args.transfer:
@@ -90,7 +74,7 @@ if __name__ == '__main__':
         start_epoch = 0
         j = 0
         lr = cfg.init_learning_rate
-        
+
     else:
         path_t = cfg.trained_model()
         if os.path.exists(path_t):
@@ -104,16 +88,16 @@ if __name__ == '__main__':
     path = os.path.join(cfg.TRAIN_DIR, 'runs', str(exp_name))
     if not os.path.exists(path):
         os.makedirs(path)
-    # If transfer flag
+
     if args.transfer:
         for params in net.parameters():
             params.requires_grad = False
         shape = net.conv5.conv.weight.shape
         new_layer = net_utils.Conv2d(shape[1], 45, shape[2], 1, relu=False)
         net.conv5 = new_layer  # make it generalizable
-        # print(shape)
+
         print('Tranfer Learning Active')
-    # net = net.cuda()
+
     # os.environ['CUDA_VISIBLE_DEVICES'] = 0, 1, 2
     # torch.cuda.manual_seed(seed)
     # net = torch.nn.DataParallel(net).cuda()
@@ -130,12 +114,10 @@ if __name__ == '__main__':
     # net = torch.nn.DataParallel(net, device_sids=list(range(torch.cuda.device_count())))
 
     optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
-    optimizer.zero_grad()
+
     # tensorboard
     if args.use_tensorboard and SummaryWriter is not None:
         summary_writer = SummaryWriter(path)
-    # else:
-    #     summary_writer = None
 
     batch_per_epoch = dataset.length / args.batch
     train_loss = 0
@@ -148,16 +130,15 @@ if __name__ == '__main__':
 
     for step in range(int(epoch), cfg.max_epoch):
 
-
         # batch
         for i, batch_of_index in enumerate(dataloader):
             t.tic()
 
             # OG yolo changes scales every 10 epochs
-            if i%10 == 0:
+            if i % 10 == 0:
                 size_index = randint(0, len(cfg.multi_scale_inp_size) - 1)
                 print('new scale is {}'.format(cfg.multi_scale_inp_size[size_index]))
-            
+
             batch = dataset.fetch_parse(batch_of_index, size_index)
             im = batch['images']
             gt_boxes = batch['gt_boxes']
@@ -208,7 +189,6 @@ if __name__ == '__main__':
                 bbox_loss, iou_loss, cls_loss = 0., 0., 0.
                 cnt = 0
                 t.clear()
-
 
         if step % cfg.lr_decay_epochs == 1:
             lr *= cfg.lr_decay

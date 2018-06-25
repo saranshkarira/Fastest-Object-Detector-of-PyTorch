@@ -1,7 +1,10 @@
 import os
 import numpy as np
+import pickle
+import json
 
 class_map = {'Weapon': [0], 'Vehicle': [1], 'Building': [2], 'Person': [3]}
+cachefile = x
 
 
 def voc_ap(rec, prec, use_07_metric=False):
@@ -47,7 +50,7 @@ def voc_eval(detpath, annopath, classname, cachedir, ovthresh=0.5, use_07_metric
 
         with open(annopath) as opener:
             annots = json.load(opener)
-
+        recs = []
         for i in annots:
             gt_boxes = []
             gt_classes = []
@@ -70,7 +73,7 @@ def voc_eval(detpath, annopath, classname, cachedir, ovthresh=0.5, use_07_metric
                             gt_boxes.append(anns)
                             gt_classes.append(class_map[k])
             imagenames.append(img)
-            recs[img] = {'gt_boxes': gt_boxes, 'gt_classes' : gt_classes}
+            recs[img] = {'gt_boxes': gt_boxes, 'gt_classes': gt_classes}
         with open(cachefile, 'wb') as f:
             pickle.dump(recs, f)
     else:
@@ -80,18 +83,17 @@ def voc_eval(detpath, annopath, classname, cachedir, ovthresh=0.5, use_07_metric
     # filter by class:
     class_recs = {}
 
-        # seq = np.asarray(range(nd))
-        # off = np.ones(nd)
-        # tpfn = seq+off
-        tpfn = 0
+    # seq = np.asarray(range(nd))
+    # off = np.ones(nd)
+    # tpfn = seq+off
+    tpfn = 0
     for imagename in imagenames:
 
-        bbox = np.array(list(filter(lambda x: recs[imagename]['gt_boxes'] if recs[imagename]['gt_classes'] == class_map[classname] else False , recs[imagename]['gt_boxes'])))
+        bbox = np.array(list(filter(lambda x: recs[imagename]['gt_boxes'] if recs[imagename]['gt_classes'] == class_map[classname] else False, recs[imagename]['gt_boxes'])))
 
-
-        det = [False]*bbox.shape(0)
+        det = [False] * bbox.shape(0)
         tpfn += sum(~np.ones(bbox.shape(0)))
-        class_recs[imagename] =  {'bbox':bbox, 'det':det}
+        class_recs[imagename] = {'bbox': bbox, 'det': det}
     # Open detection, and annotation and then calculate precision recall
     detfile = detpath.format(classname)
 
@@ -113,7 +115,6 @@ def voc_eval(detpath, annopath, classname, cachedir, ovthresh=0.5, use_07_metric
         nd = len(image_ids)
         tp = np.zeros(nd)
         fp = np.zeros(nd)
-
 
         for d in range(nd):
             R = class_recs[image_ids[d]]
@@ -140,7 +141,6 @@ def voc_eval(detpath, annopath, classname, cachedir, ovthresh=0.5, use_07_metric
                 ovmax = np.max(overlaps)
                 jmax = np.argmax(overlaps)
 
-
             if ovmax > ovthresh:
                 if not R['det'][jmax]:
                     tp[d] = 1
@@ -149,14 +149,14 @@ def voc_eval(detpath, annopath, classname, cachedir, ovthresh=0.5, use_07_metric
                 else:
                     fp[d] = 1
 
-            else: 
+            else:
                 fp[d] = 1
 
         fp = np.cumsum(fp)
         tp = np.cumsum(tp)
         rec = tp / float(tpfn)
 
-        prec = tp/ np.maximum(tp+fp, np.finfo(np.float64).eps)
+        prec = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
         ap = voc_ap(rec, prec, use_07_metric)
 
     else:
@@ -165,6 +165,3 @@ def voc_eval(detpath, annopath, classname, cachedir, ovthresh=0.5, use_07_metric
         ap = -1
 
     return rec, prec, ap
-
-
-        

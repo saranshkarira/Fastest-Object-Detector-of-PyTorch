@@ -10,11 +10,53 @@ for layer in model.modules():
         layer.weight.data = torch.from_numpy(new_filters).float()
         layer.out_channels = new_filters.shape[0]
 
+# 1.5
+# Rescale
+
+
+class Rescale(object):
+    """Rescale the image in a sample to a given size.
+
+    Args:
+        output_size (tuple or int): Desired output size. If tuple, output is
+            matched to output_size. If int, smaller of image edges is matched
+            to output_size keeping aspect ratio the same.
+    """
+
+    def __init__(self, output_size):
+
+        assert isinstance(output_size, (int, tuple))
+        self.output_size = output_size
+
+    def __call__(self, sample):
+        image, gt_boxes = sample['image'], sample['gt_boxes']
+        h, w = image.shape[:2]
+
+        if isinstance(self.output_size, int):
+            if h > w:
+                new_h, new_w = self.output_size * h / w, self.output_size
+
+            else:
+                new_h, new_w = self.output_size, self.output_size * w / h
+
+        else:
+            new_h, new_w = self.output_size
+
+        new_h, new_w = int(new_h), int(new_w)
+
+        sample['image'] = sktransform.resize(image, (new_h, new_w), mode='constant')
+
+        sample['gt_boxes'] = gt_boxes * [new_w / w, new_h / h, new_w / w, new_h / h]
+
 # 2
+
+
 def __getitem__(self, idx):
     return idx
 
 # 3
+
+
 def fetch_batch_data(self, ith, x, size_index):
     images, gt_boxes, classes, dontcare = self._im_processor(
         [self.image_names[x], self.get_annotation(x), self.dst_size], None)
@@ -34,6 +76,8 @@ def fetch_batch_data(self, ith, x, size_index):
     # self.batch[]
 
 # 4
+
+
 def parse(self, index, size_index):
     index = index.numpy()
     lenindex = len(index)

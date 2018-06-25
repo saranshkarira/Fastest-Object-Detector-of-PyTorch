@@ -16,8 +16,7 @@ import sys
 
 
 class dataset(data.Dataset):
-    def __init__(self, target_file, root_dir, multiscale): # , transforms=True):
-        
+    def __init__(self, target_file, root_dir, multiscale):  # , transforms=True):
         """
         Args:
             target_file (string): Path to the target file with annotations.
@@ -25,14 +24,13 @@ class dataset(data.Dataset):
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
-
-
+        self.crop = 320
         self.root_dir = root_dir
 
         self.env = lmdb.open(root_dir, max_readers=1, readonly=True, lock=False, readahead=False, meminit=False)
         self.txn = self.env.begin(write=False)
         self.length = self.txn.stat()['entries'] - 4  # for mapping
-        
+
         classes = None
         if classes is None:
             self._classes = {'Weapon', 'Vehicle', 'Building', 'Person'}
@@ -44,9 +42,8 @@ class dataset(data.Dataset):
         with open(target_file) as opener:
             self.targets = json.load(opener)
 
-        self._salt = str()
         self.dst_size = multiscale
-        self.sample = {'image': [], 'gt_boxes': [], 'gt_classes': [], 'dontcare': []}
+        # self.sample = {'image': [], 'gt_boxes': [], 'gt_classes': [], 'dontcare': []}
     # len
 
     def __len__(self):
@@ -65,7 +62,7 @@ class dataset(data.Dataset):
 
         # random amplify each channel
         im = im.astype(np.float)
-        im *= (1 + t * a) # (* 1.0x, x is a random value)
+        im *= (1 + t * a)  # (* 1.0x, x is a random value)
         mx = 255. * (1 + a)
         up = np.random.uniform(-1, 1)
         im = np.power(im / mx, 1. + up * .5)
@@ -89,7 +86,6 @@ class dataset(data.Dataset):
         boxes[:, 3::4] = np.maximum(np.minimum(boxes[:, 3::4], im_shape[0] - 1), 0)
         return boxes
 
-
     def multiscale(inp_size, gt_boxes, im):
 
         if inp_size is not None:
@@ -101,11 +97,7 @@ class dataset(data.Dataset):
             except IndexError:
                 print(gt_boxes.shape)
                 sys.exit(1)
-            im = cv2.resize(im, (w, h))
-
-
-        w, h = inp_size
-        im = cv2.resize(im, (h, w))
+            im = cv2.resize(im, (h, w))
 
         return gt_boxes, im
 
@@ -136,8 +128,6 @@ class dataset(data.Dataset):
             output_size = (output_size, output_size)
         else:
             assert len(output_size) == 2
-            
-
 
         h, w = im.shape[:2]
         new_h, new_w = output_size
@@ -150,8 +140,6 @@ class dataset(data.Dataset):
         gt_boxes = gt_boxes - [left, top, left, top]
 
         return im, gt_boxes
-
-
 
     def preprocess_train(self, index, size_index, multi_scale_inp_size):
 
@@ -183,20 +171,19 @@ class dataset(data.Dataset):
 
         im = cv2.imdecode(np.fromstring(im, dtype=np.uint8), 1)
 
-        # transforms: 
+        # transforms:
 
-        ori_im = np.copy(im) 
+        ori_im = np.copy(im)
 
         gt_boxes, im = self.multiscale(inp_size, gt_boxes, im)
 
         if self.crop:
-            im, gt_boxes = self.random_crop(output, im, gt_boxes)
+            im, gt_boxes = self.random_crop(self.crop, im, gt_boxes)
 
         im, gt_boxes = self.flip(im, gt_boxes)
 
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         im = self.imcv2_recolor(im)
-
 
         gt_boxes = self.clip_boxes(gt_boxes, im.shape)
 
@@ -223,8 +210,6 @@ class dataset(data.Dataset):
     #             'gt_classes': torch.Tensor(sample['gt_classes']),
     #             'dontcare': torch.from_numpy(np.asarray(sample['dontcare']))}
 
-
-
     def fetch_parse(self, index, size_index):
         index = index.numpy()
         lenindex = len(index)
@@ -248,45 +233,4 @@ class dataset(data.Dataset):
         return self.batch
 
     # ######END#######
-
-
-
-
-
-# Rescale
-
-class Rescale(object):
-    """Rescale the image in a sample to a given size.
-
-    Args:
-        output_size (tuple or int): Desired output size. If tuple, output is
-            matched to output_size. If int, smaller of image edges is matched
-            to output_size keeping aspect ratio the same.
-    """
-
-    def __init__(self, output_size):
-
-        assert isinstance(output_size, (int, tuple))
-        self.output_size = output_size
-
-    def __call__(self, sample):
-        image, gt_boxes = sample['image'], sample['gt_boxes']
-        h, w = image.shape[:2]
-
-        if isinstance(self.output_size, int):
-            if h > w:
-                new_h, new_w = self.output_size * h / w, self.output_size
-
-            else:
-                new_h, new_w = self.output_size, self.output_size * w / h
-
-        else:
-            new_h, new_w = self.output_size
-
-        new_h, new_w = int(new_h), int(new_w)
-
-        sample['image'] = sktransform.resize(image, (new_h, new_w), mode='constant')
-
-        sample['gt_boxes'] = gt_boxes * [new_w / w, new_h / h, new_w / w, new_h / h]
-
 
