@@ -16,7 +16,7 @@ import sys
 
 
 class dataset(data.Dataset):
-    def __init__(self, target_file, root_dir, multiscale) # , transforms=True):
+    def __init__(self, target_file, root_dir, multiscale): # , transforms=True):
         
         """
         Args:

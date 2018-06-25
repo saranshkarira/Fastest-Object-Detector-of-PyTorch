@@ -106,7 +106,7 @@ def clean_ckpts(train_dir):
 pretrained_model = glob.glob(os.path.join(MODEL_DIR, '*.npz'))[0]
 
 # train_output_dir = os.path.join(TRAIN_DIR, exp_name)
-test_output_dir = os.path.join(TEST_DIR, imdb_test, h5_fname)
+# test_output_dir = os.path.join(TEST_DIR, imdb_test, h5_fname)
 
 # mkdir(test_output_dir, max_depth=4)
 
