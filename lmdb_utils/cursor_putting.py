@@ -3,6 +3,7 @@ import os
 import sys
 import lmdb
 import cv2
+import glob
 # import pickle
 
 
@@ -15,11 +16,20 @@ def write_to_db(env, batch):
         # 	txn.put(k,v)
 
 
-def converter(output_path, input_path):
+def converter(input_path, output_path, targets):
     env = lmdb.open(output_path, map_size=9959123412)
     batch = []
     counter = 0
-    joker = os.listdir(input_path)
+    if os.path.exists(glob.glob(os.path.join(targets,'*.json'))[0]):
+        target_file = glob.glob(os.path.join(targets,'*.json'))[0]
+        with open(target_file) as opener:
+            targets = json.load(opener)
+        joker = [targets[i]['Var1'].split('/')[-1] for i in range(len(targets))]
+
+
+    else:
+        joker = os.listdir(input_path)
+
     joker.sort()
 
     for image_name in joker:
@@ -64,10 +74,10 @@ def converter(output_path, input_path):
 
 
 if __name__ == '__main__':
-    # input_path = sys.argv[2]
-    # output_path = sys.argv[1]
-    input_path = os.path.abspath(os.path.join(os.path.dirname(__file__),"..", "db", "raw_images"))
-    output_path = os.path.abspath(os.path.join(os.path.dirname(__file__),"..", "db", "image_data"))
+    path = os.path.abspath(os.path.join(os.path.dirname(__file__),"..", "db"))
+    input_path = os.path.join(path, "raw_images")
+    output_path = os.path.join(path, "image_data")
+    target_path = os.path.join(path, "targets")
 
 
-    converter(output_path, input_path)
+    converter(input_path, output_path, target_path)
