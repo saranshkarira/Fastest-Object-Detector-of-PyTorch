@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 from .im_transform import imcv2_affine_trans, imcv2_recolor
-# from box import BoundBox, box_iou, prob_compare
 from utils.nms_wrapper import nms
 from utils.cython_yolo import yolo_to_bbox
 
@@ -30,52 +29,6 @@ def nms_detections(pred_boxes, scores, nms_thresh):
     keep = nms(dets, nms_thresh)
     return keep
 
-
-def _offset_boxes(boxes, im_shape, scale, offs, flip):
-    if len(boxes) == 0:
-        return boxes
-    boxes = np.asarray(boxes, dtype=np.float)
-    boxes *= scale
-    boxes[:, 0::2] -= offs[0]
-    boxes[:, 1::2] -= offs[1]
-    boxes = clip_boxes(boxes, im_shape)
-
-    if flip:
-        boxes_x = np.copy(boxes[:, 0])
-        boxes[:, 0] = im_shape[1] - boxes[:, 2]
-        boxes[:, 2] = im_shape[1] - boxes_x
-
-    return boxes
-
-
-def preprocess_train(data, size_index):
-    im_path, blob, inp_size = data
-    inp_size = inp_size[size_index]
-    boxes, gt_classes = blob['boxes'], blob['gt_classes']
-
-    im = cv2.imread(im_path)
-    ori_im = np.copy(im)
-
-    im, trans_param = imcv2_affine_trans(im)
-    scale, offs, flip = trans_param
-    boxes = _offset_boxes(boxes, im.shape, scale, offs, flip)
-
-    if inp_size is not None:
-        w, h = inp_size
-        boxes[:, 0::2] *= float(w) / im.shape[1]
-        boxes[:, 1::2] *= float(h) / im.shape[0]
-        im = cv2.resize(im, (w, h))
-    im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-    im = imcv2_recolor(im)
-    # im /= 255.
-
-    # im = imcv2_recolor(im)
-    # h, w = inp_size
-    # im = cv2.resize(im, (w, h))
-    # im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-    # im /= 255
-    boxes = np.asarray(boxes, dtype=np.int)
-    return im, boxes, gt_classes, [], ori_im
 
 
 def preprocess_test(data, size_index):

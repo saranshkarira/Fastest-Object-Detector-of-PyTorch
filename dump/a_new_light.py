@@ -1,5 +1,5 @@
 
-
+# 1
 for layer in model.modules():
     if isinstance(layer, nn.Conv2d):
         print("Pruning Conv-{}".format(index))
@@ -10,11 +10,11 @@ for layer in model.modules():
         layer.weight.data = torch.from_numpy(new_filters).float()
         layer.out_channels = new_filters.shape[0]
 
-
+# 2
 def __getitem__(self, idx):
     return idx
 
-
+# 3
 def fetch_batch_data(self, ith, x, size_index):
     images, gt_boxes, classes, dontcare = self._im_processor(
         [self.image_names[x], self.get_annotation(x), self.dst_size], None)
@@ -33,7 +33,7 @@ def fetch_batch_data(self, ith, x, size_index):
     self.batch['dontcare'][ith] = dontcare
     # self.batch[]
 
-
+# 4
 def parse(self, index, size_index):
     index = index.numpy()
     lenindex = len(index)
@@ -50,7 +50,7 @@ def parse(self, index, size_index):
     return self.batch
 
 
-# 3
+# 5
 
     print(idx)
     image_id = self.mapping[idx]

@@ -13,7 +13,7 @@ for q = 1:length(mat)
                 a(:,2) = y2;
                 labels{:,:}{i,j} = a;
             end
-         end
+        end
     end
     paths = y.gTruth.DataSource.Source;
     dict = [paths, labels];

@@ -1,4 +1,10 @@
+Python==2.7
 Cython==0.27.3
 opencv-python==3.3.0.10
 h5py==2.7.1
-pycrayon==0.5
+TensorboardX==any
+LMDB == any
+Matlab == R2017b
+Pytorch == 0.3
+
+

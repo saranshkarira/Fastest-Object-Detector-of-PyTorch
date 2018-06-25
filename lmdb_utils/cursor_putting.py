@@ -1,5 +1,4 @@
 
-
 import os
 import sys
 import lmdb
@@ -16,7 +15,7 @@ def write_to_db(env, batch):
         # 	txn.put(k,v)
 
 
-def converter(output_path):
+def converter(output_path, input_path):
     env = lmdb.open(output_path, map_size=9959123412)
     batch = []
     counter = 0
@@ -33,7 +32,6 @@ def converter(output_path):
             continue
         img = cv2.imread(image_path)
 
-        # print(img)
         image_binary = cv2.imencode(".jpg", img)[1].tostring()
         # print(type(string))
         # image_binary = str.encode(string)
@@ -66,6 +64,10 @@ def converter(output_path):
 
 
 if __name__ == '__main__':
-    input_path = sys.argv[2]
-    output_path = sys.argv[1]
+    # input_path = sys.argv[2]
+    # output_path = sys.argv[1]
+    input_path = os.path.abspath(os.path.join(os.path.dirname(__file__),"..", "db", "raw_images"))
+    output_path = os.path.abspath(os.path.join(os.path.dirname(__file__),"..", "db", "image_data"))
+
+
     converter(output_path, input_path)
