@@ -148,12 +148,16 @@ if __name__ == '__main__':
 
     for step in range(int(epoch), cfg.max_epoch):
 
-        size_index = randint(0, len(cfg.multi_scale_inp_size) - 1)
-        print('new scale is {}'.format(cfg.multi_scale_inp_size[size_index]))
+
         # batch
         for i, batch_of_index in enumerate(dataloader):
             t.tic()
 
+            # OG yolo changes scales every 10 epochs
+            if i%10 == 0:
+                size_index = randint(0, len(cfg.multi_scale_inp_size) - 1)
+                print('new scale is {}'.format(cfg.multi_scale_inp_size[size_index]))
+            
             batch = dataset.fetch_parse(batch_of_index, size_index)
             im = batch['images']
             gt_boxes = batch['gt_boxes']

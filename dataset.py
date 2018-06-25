@@ -131,25 +131,25 @@ class dataset(data.Dataset):
             output_size (tuple or int): Desired output size. If int, square crop
                 is made.
         """
-            assert isinstance(output_size, (int, tuple))
-            if isinstance(output_size, int):
-                output_size = (output_size, output_size)
-            else:
-                assert len(output_size) == 2
-                
+        assert isinstance(output_size, (int, tuple))
+        if isinstance(output_size, int):
+            output_size = (output_size, output_size)
+        else:
+            assert len(output_size) == 2
+            
 
 
-            h, w = im.shape[:2]
-            new_h, new_w = output_size
+        h, w = im.shape[:2]
+        new_h, new_w = output_size
 
-            top = np.random.randint(0, h - new_h)
-            left = np.random.randint(0, w - new_w)
+        top = np.random.randint(0, h - new_h)
+        left = np.random.randint(0, w - new_w)
 
-            im = im[top: top + new_h, left: left + new_w]
+        im = im[top: top + new_h, left: left + new_w]
 
-            gt_boxes = gt_boxes - [left, top, left, top]
+        gt_boxes = gt_boxes - [left, top, left, top]
 
-            return im, gt_boxes
+        return im, gt_boxes
 
 
 
