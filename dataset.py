@@ -5,7 +5,7 @@ import torch.utils.data as data
 import numpy as np
 
 import cv2
-from skimage import transform as sktransform
+
 import json
 import lmdb
 
@@ -56,7 +56,7 @@ class dataset(data.Dataset):
 
     # ### START #####
 
-    def imcv2_recolor(im, a=.1):
+    def imcv2_recolor(self, im, a=.1):
 
         t = np.random.uniform(-1, 1, 3)
 
@@ -86,14 +86,14 @@ class dataset(data.Dataset):
         boxes[:, 3::4] = np.maximum(np.minimum(boxes[:, 3::4], im_shape[0] - 1), 0)
         return boxes
 
-    def multiscale(inp_size, gt_boxes, im):
+    def multiscale(self, inp_size, gt_boxes, im):
 
         if inp_size is not None:
             w, h = inp_size
 
             try:
-                gt_boxes[:, 0::2] *= float(w) / im.shape[1]
-                gt_boxes[:, 1::2] *= float(h) / im.shape[0]
+                gt_boxes[:, 0::2] *= w / im.shape[1]
+                gt_boxes[:, 1::2] *= h / im.shape[0]
             except IndexError:
                 print(gt_boxes.shape)
                 sys.exit(1)
@@ -101,7 +101,7 @@ class dataset(data.Dataset):
 
         return gt_boxes, im
 
-    def flip(im, boxes):
+    def flip(self, im, boxes):
         if len(boxes) == 0:
             return boxes
 
@@ -116,7 +116,7 @@ class dataset(data.Dataset):
 
         return im, boxes
 
-    def random_crop(output_size, im, gt_boxes):
+    def random_crop(self, output_size, im, gt_boxes):
         """Crop randomly the image in a sample.
 
         Args:
@@ -175,6 +175,7 @@ class dataset(data.Dataset):
 
         ori_im = np.copy(im)
 
+        gt_boxes = np.asarray(gt_boxes)
         gt_boxes, im = self.multiscale(inp_size, gt_boxes, im)
 
         if self.crop:
@@ -233,4 +234,3 @@ class dataset(data.Dataset):
         return self.batch
 
     # ######END#######
-

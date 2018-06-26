@@ -114,7 +114,7 @@ if __name__ == '__main__':
     # net = torch.nn.DataParallel(net, device_sids=list(range(torch.cuda.device_count())))
 
     optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
-
+    print('this')
     # tensorboard
     if args.use_tensorboard and SummaryWriter is not None:
         summary_writer = SummaryWriter(path)
@@ -127,7 +127,7 @@ if __name__ == '__main__':
     size_index = 0
     t = Timer()
     epoch = start_epoch
-
+    print('this')
     for step in range(int(epoch), cfg.max_epoch):
 
         # batch
