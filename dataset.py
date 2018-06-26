@@ -24,12 +24,12 @@ class dataset(data.Dataset):
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
-        self.crop = 320
+        self.crop = False
         self.root_dir = root_dir
 
         self.env = lmdb.open(root_dir, max_readers=1, readonly=True, lock=False, readahead=False, meminit=False)
         self.txn = self.env.begin(write=False)
-        self.length = self.txn.stat()['entries'] - 4  # for mapping
+        self.length = self.txn.stat()['entries']  # for mapping
 
         classes = None
         if classes is None:
@@ -92,8 +92,8 @@ class dataset(data.Dataset):
             w, h = inp_size
 
             try:
-                gt_boxes[:, 0::2] *= w / im.shape[1]
-                gt_boxes[:, 1::2] *= h / im.shape[0]
+                gt_boxes[:, 0::2] *= float(w) / im.shape[1]
+                gt_boxes[:, 1::2] *= float(h) / im.shape[0]
             except IndexError:
                 print(gt_boxes.shape)
                 sys.exit(1)
@@ -105,7 +105,7 @@ class dataset(data.Dataset):
         if len(boxes) == 0:
             return boxes
 
-        boxes = np.asarray(boxes, dtype=np.float)
+        boxes = boxes
 
         flip = np.random.uniform() > 0.5
         if flip:
@@ -175,7 +175,7 @@ class dataset(data.Dataset):
 
         ori_im = np.copy(im)
 
-        gt_boxes = np.asarray(gt_boxes)
+        gt_boxes = np.asarray(gt_boxes, dtype=np.float64)
         gt_boxes, im = self.multiscale(inp_size, gt_boxes, im)
 
         if self.crop:
