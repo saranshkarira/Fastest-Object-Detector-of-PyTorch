@@ -1,9 +1,10 @@
 
 import os
-import sys
+# import sys
 import lmdb
 import cv2
 import glob
+import json
 
 
 def write_to_db(env, batch):
@@ -20,7 +21,7 @@ def converter(input_path, output_path, targets):
         target_file = glob.glob(os.path.join(targets, '*.json'))[0]
         with open(target_file) as opener:
             targets = json.load(opener)
-        joker = [targets[i]['Var1'].split('/')[-1] for i in range(len(targets))]
+        joker = [str(targets[i]['Var1'].split('/')[-1]) for i in range(len(targets))]
 
     else:
         joker = os.listdir(input_path)

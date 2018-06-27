@@ -95,6 +95,8 @@ if __name__ == '__main__':
         shape = net.conv5.conv.weight.shape
         new_layer = net_utils.Conv2d(shape[1], 45, shape[2], 1, relu=False)
         net.conv5 = new_layer  # make it generalizable
+        for params in net.conv5.parameters():
+            params.requires_grad = True
 
         print('Tranfer Learning Active')
 
@@ -108,10 +110,11 @@ if __name__ == '__main__':
     # Optimizer
 
     optimizable = net.conv5.parameters  # this is always the case whether transfer or not
-    net.cuda()
+    # net.cuda()
     # net = torch.nn.DataParallel(net)
 
-    # net = torch.nn.DataParallel(net, device_sids=list(range(torch.cuda.device_count())))
+    # net = torch.nn.DataParallel(net, device_ids=list(range(torch.cuda.device_count())))
+    net.cuda()
 
     optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
     print('this')
@@ -150,7 +153,7 @@ if __name__ == '__main__':
                                           is_cuda=True,
                                           volatile=False).permute(0, 3, 1, 2)
 
-            bbox_pred, iou_pred, prob_pred = net(im, gt_boxes=gt_boxes, gt_classes=gt_classes, dontcare=dontcare, size_index=size_index)
+            bbox_pred, iou_pred, prob_pred = net(im, gt_boxes, gt_classes, dontcare, size_index)
 
             loss = net.loss
             bbox_loss += net.bbox_loss.data.cpu().numpy()[0]

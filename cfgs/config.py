@@ -4,7 +4,6 @@ from .exps.darknet19_exp1 import *  # noqa
 import glob
 
 
-
 # creates non existing directories
 def mkdir(path, max_depth=3):
     parent, child = os.path.split(path)
@@ -66,17 +65,18 @@ thresh = 0.3
 # dir config
 ############################
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-DATA_DIR = os.path.join(ROOT_DIR, 'data')
+DATA_DIR = os.path.join(ROOT_DIR, 'db')
 MODEL_DIR = os.path.join(ROOT_DIR, 'models')
 TRAIN_DIR = os.path.join(MODEL_DIR, 'training')
 TEST_DIR = os.path.join(MODEL_DIR, 'testing')
 
-root_dir = os.path.join(ROOT_DIR, 'db', 'image_data')
-target_file = os.path.join(ROOT_DIR, 'db', 'targets', '*.json')
-target_file = glob.glob(target_file)[0]
+root_dir = os.path.join(DATA_DIR, 'image_data')
+target_file = glob.glob(os.path.join(DATA_DIR, 'targets', '*.json'))[0]
 transforms = False
 
 # gets the latest file from the latest experiment and returns its abs path
+
+
 def trained_model():
     exp_name = str(sorted([int(i.split('/')[-1]) for i in glob.glob(os.path.join(TRAIN_DIR, 'checkpoints', '*'))])[-1])
     trained_model = glob.glob(os.path.join(TRAIN_DIR, 'checkpoints', exp_name, '*.h5'))
@@ -105,10 +105,6 @@ def clean_ckpts(train_dir):
 # get the pretrained model(The one we apply transfer learning on)
 pretrained_model = glob.glob(os.path.join(MODEL_DIR, '*.npz'))[0]
 
-# train_output_dir = os.path.join(TRAIN_DIR, exp_name)
-# test_output_dir = os.path.join(TEST_DIR, imdb_test, h5_fname)
-
-# mkdir(test_output_dir, max_depth=4)
 
 rand_seed = 1024
 use_tensorboard = True

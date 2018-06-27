@@ -188,8 +188,9 @@ class Darknet19(nn.Module):
     def loss(self):
         return self.bbox_loss + self.iou_loss + self.cls_loss
 
-    def forward(self, im_data, gt_boxes=None, gt_classes=None, dontcare=None,
-                size_index=0):
+    def forward(self, im_data, gt_boxes, gt_classes, dontcare,
+                size_index):
+        # print(size_index)
         conv1s = self.conv1s(im_data)
         conv2 = self.conv2(conv1s)
         conv3 = self.conv3(conv2)

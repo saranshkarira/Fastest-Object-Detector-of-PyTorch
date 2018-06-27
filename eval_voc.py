@@ -4,7 +4,6 @@ import pickle
 import json
 
 class_map = {'Weapon': [0], 'Vehicle': [1], 'Building': [2], 'Person': [3]}
-cachefile = x
 
 
 def voc_ap(rec, prec, use_07_metric=False):
@@ -44,9 +43,9 @@ def voc_ap(rec, prec, use_07_metric=False):
 def voc_eval(detpath, annopath, classname, cachedir, ovthresh=0.5, use_07_metric=False):
     if not os.path.isdir(cachedir):
         os.mkdir(cachedir)
-    cachedir = os.path.join(cachedir, 'annots.pkl')
+    cachefile = os.path.join(cachedir, 'annots.pkl')
 
-    if not os.path.exists(cachedir):
+    if not os.path.exists(cachefile):
 
         with open(annopath) as opener:
             annots = json.load(opener)

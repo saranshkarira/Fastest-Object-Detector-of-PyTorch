@@ -13,10 +13,15 @@ import lmdb
 import threading
 
 import sys
+from cfgs import config as cfg
+import time
+import os
+from eval_voc import voc_eval
+import pickle
 
 
 class dataset(data.Dataset):
-    def __init__(self, target_file, root_dir, multiscale):  # , transforms=True):
+    def __init__(self, target_file, root_dir, multiscale, train=True):  # , transforms=True):
         """
         Args:
             target_file (string): Path to the target file with annotations.
@@ -26,18 +31,21 @@ class dataset(data.Dataset):
         """
         self.crop = False
         self.root_dir = root_dir
+        self.train = train
+        self.eval_name = str(time.time()) + '{}.txt'
+        self.year = 2007  # eval metric
 
         self.env = lmdb.open(root_dir, max_readers=1, readonly=True, lock=False, readahead=False, meminit=False)
         self.txn = self.env.begin(write=False)
-        self.length = self.txn.stat()['entries']  # for mapping
+        self.length = self.txn.stat()['entries'] - 4  # for mapping
 
         classes = None
         if classes is None:
-            self._classes = {'Weapon', 'Vehicle', 'Building', 'Person'}
+            self.classes = {'Weapon', 'Vehicle', 'Building', 'People'}
         else:
-            self._classes = classes
+            self.classes = classes
 
-        self.class_map = {'Weapon': [0], 'Vehicle': [1], 'Building': [2], 'Person': [3]}
+        self.class_map = {'Weapon': [0], 'Vehicle': [1], 'Building': [2], 'People': [3]}
 
         with open(target_file) as opener:
             self.targets = json.load(opener)
@@ -141,17 +149,14 @@ class dataset(data.Dataset):
 
         return im, gt_boxes
 
-    def preprocess_train(self, index, size_index, multi_scale_inp_size):
-
-        inp_size = multi_scale_inp_size[size_index]
-
+    def get_annots(self, index):
         gt_boxes = []
         gt_classes = []
         # image_id = self.targets[index]['Var1'].split('/')[-1].encode()
         for k, v in self.targets[index].iteritems():
 
             if k == 'Var1':
-                image_id = v.split('/')[-1].encode()
+                image_id = v.split('/')[-1]
 
             elif len(v) == 0:
                 pass
@@ -165,9 +170,17 @@ class dataset(data.Dataset):
                     gt_boxes.append(anns)
                     gt_classes.append(self.class_map[k])
 
+        return image_id, gt_boxes, gt_classes
+
+    def preprocess_train(self, index, size_index, multi_scale_inp_size):
+
+        inp_size = multi_scale_inp_size[size_index]
+
+        image_id, gt_boxes, gt_classes = self.get_annots(index)
+
         # use map function here
         with self.txn.cursor() as cursor:  # cannot append before preprocess
-            im = cursor.get(image_id)  # check cursor for list parsing #append because we are getting images manually now
+            im = cursor.get(image_id.encode())  # check cursor for list parsing #append because we are getting images manually now
 
         im = cv2.imdecode(np.fromstring(im, dtype=np.uint8), 1)
 
@@ -177,16 +190,18 @@ class dataset(data.Dataset):
 
         gt_boxes = np.asarray(gt_boxes, dtype=np.float64)
         gt_boxes, im = self.multiscale(inp_size, gt_boxes, im)
-
-        if self.crop:
-            im, gt_boxes = self.random_crop(self.crop, im, gt_boxes)
-
-        im, gt_boxes = self.flip(im, gt_boxes)
-
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-        im = self.imcv2_recolor(im)
 
-        gt_boxes = self.clip_boxes(gt_boxes, im.shape)
+        # Don't run tfms below during eval/test
+        if self.train:
+            if self.crop:
+                im, gt_boxes = self.random_crop(self.crop, im, gt_boxes)
+
+            im, gt_boxes = self.flip(im, gt_boxes)
+
+            im = self.imcv2_recolor(im)
+
+            gt_boxes = self.clip_boxes(gt_boxes, im.shape)
 
         return im, gt_boxes, gt_classes, [], ori_im
 
@@ -228,9 +243,82 @@ class dataset(data.Dataset):
         for ith in range(lenindex):
             ths[ith].join()
 
-        self.batch['images'] = np.asarray(self.batch['images'], dtype=np.float32)
+        self.batch['images'] = np.asarray(self.batch['images'], dtype=np.float64)
 
         # self.batch = self.to_tensor()
         return self.batch
 
     # ######END#######
+
+    # ######START EVAL#######
+
+    def evaluate_detections(self, all_boxes, output_dir=None):
+        """
+        all_boxes is a list of length number-of-classes.
+        Each list element is a list of length number-of-images.
+        Each of those list elements is either an empty list []
+        or a numpy array of detection.
+
+        all_boxes[class][image] = [] or np.array of shape #dets x 5
+        """
+        self._write_voc_results_file(all_boxes)
+        self._do_python_eval(output_dir)
+        # if self.config['cleanup']:
+        #     for cls in self._classes:
+        #         if cls == '__background__':
+        #             continue
+        #         filename = self._get_voc_results_file_template().format(cls)
+        #         os.remove(filename)
+
+    def _write_voc_results_file(self, all_boxes):
+        for cls_ind, cls in enumerate(self.classes):
+            if cls == '__background__':
+                continue
+            print('Writing {} VOC results file'.format(cls))
+            filename = self.eval_name.format(cls)
+            with open(filename, 'wt') as f:
+                for index in range(self.length):
+                    dets = all_boxes[cls_ind][index]
+                    if dets == []:
+                        continue
+                    # the VOCdevkit expects 1-based indices
+                    image_id = self.targets[index]['Var1'].split('/')[-1]
+                    for k in range(dets.shape[0]):
+                        f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
+                                format(image_id, dets[k, -1],
+                                       dets[k, 0] + 1, dets[k, 1] + 1,
+                                       dets[k, 2] + 1, dets[k, 3] + 1))
+
+    def _do_python_eval(self, output_dir='output'):
+        annopath = cfg.target_file
+        cachedir = os.path.join(cfg.TEST_DIR, 'annotations_cache')
+        aps = []
+        # The PASCAL VOC metric changed in 2010
+        use_07_metric = True if int(self.year) < 2010 else False
+        print('VOC07 metric? ' + ('Yes' if use_07_metric else 'No'))
+        if output_dir is not None and not os.path.isdir(output_dir):
+            os.mkdir(output_dir)
+        for i, cls in enumerate(self.classes):
+            if cls == '__background__':
+                continue
+            filename = self.eval_name.format(cls)
+            rec, prec, ap = voc_eval(
+                filename, annopath, cls, cachedir, ovthresh=0.5,
+                use_07_metric=use_07_metric)
+            aps += [ap]
+            print(('AP for {} = {:.4f}'.format(cls, ap)))
+            if output_dir is not None:
+                with open(os.path.join(output_dir, cls + '_pr.pkl'), 'wb') as f:
+                    pickle.dump({'rec': rec, 'prec': prec, 'ap': ap}, f)
+        print(('Mean AP = {:.4f}'.format(np.mean(aps))))
+        print('~~~~~~~~')
+        print('Results:')
+        for ap in aps:
+            print(('{:.3f}'.format(ap)))
+        print(('{:.3f}'.format(np.mean(aps))))
+        print('~~~~~~~~')
+        print('')
+        print('--------------------------------------------------------------')
+        print('Results computed with the **unofficial** Python eval code.')
+        print('Results should be very close to the official MATLAB eval code.')
+        print('--------------------------------------------------------------')
