@@ -1,7 +1,7 @@
 
 
 start_step = 0
-lr_decay_epochs = 40
+lr_decay_epochs = {20, 50, 90}
 lr_decay = 1. / 10
 
 max_epoch = 160

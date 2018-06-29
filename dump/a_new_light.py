@@ -1,3 +1,24 @@
+    def multiscale(self, inp_size, gt_boxes, im):
+
+        if inp_size is not None:
+            _, scale = inp_size
+        h, w = im.shape[:2]
+
+        if isinstance(scale, int):
+            if h > w:
+                new_h, new_w = scale * h / w, scale
+
+            else:
+                new_h, new_w = scale, scale * w / h
+
+        try:
+            gt_boxes[:, 0::2] *= int(float(new_w) / im.shape[1])
+            gt_boxes[:, 1::2] *= int(float(new_h) / im.shape[0])
+        except IndexError:
+            print(gt_boxes.shape)
+            sys.exit(1)
+        im = cv2.resize(im, (new_h, new_w))
+        return gt_boxes, im
 
 # 1
 for layer in model.modules():

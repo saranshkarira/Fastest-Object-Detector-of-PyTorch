@@ -13,12 +13,12 @@ def write_to_db(env, batch):
             cursor.putmulti(batch, dupdata=True, overwrite=True, append=False)
 
 
-def converter(input_path, output_path, targets):
+def converter(input_path, output_path, target_dir):
     env = lmdb.open(output_path, map_size=9959123412)
     batch = []
     counter = 0
-    if os.path.exists(glob.glob(os.path.join(targets, '*.json'))[0]):
-        target_file = glob.glob(os.path.join(targets, '*.json'))[0]
+    if os.path.exists(glob.glob(os.path.join(target_dir, '*.json'))[0]):
+        target_file = glob.glob(os.path.join(target_dir, '*.json'))[0]
         with open(target_file) as opener:
             targets = json.load(opener)
         joker = [str(targets[i]['Var1'].split('/')[-1]) for i in range(len(targets))]
@@ -53,7 +53,7 @@ def converter(input_path, output_path, targets):
 
 
 if __name__ == '__main__':
-    path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "db"))
+    path = os.path.abspath(os.path.join(os.path.dirname(__file__), "db"))
     input_path = os.path.join(path, "raw_images")
     output_path = os.path.join(path, "image_data")
     target_path = os.path.join(path, "targets")

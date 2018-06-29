@@ -56,7 +56,7 @@ def voc_eval(detpath, annopath, classname, cachedir, ovthresh=0.5, use_07_metric
             imagenames = []
             for k, v in i.iteritems():
                 if k == 'Var1':
-                    img = v.split('/')[-1].encode()
+                    img = v.split('/')[-1]
 
                 elif k == classname:
 

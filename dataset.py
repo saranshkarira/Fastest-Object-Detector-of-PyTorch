@@ -29,13 +29,13 @@ class dataset(data.Dataset):
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
-        self.crop = False
+        self.crop = 320
         self.root_dir = root_dir
         self.train = train
         self.eval_name = str(time.time()) + '{}.txt'
         self.year = 2007  # eval metric
 
-        self.env = lmdb.open(root_dir, max_readers=1, readonly=True, lock=False, readahead=False, meminit=False)
+        self.env = lmdb.open(root_dir, max_readers=5, readonly=True, lock=False, readahead=False, meminit=False)
         self.txn = self.env.begin(write=False)
         self.length = self.txn.stat()['entries'] - 4  # for mapping
 
@@ -94,19 +94,43 @@ class dataset(data.Dataset):
         boxes[:, 3::4] = np.maximum(np.minimum(boxes[:, 3::4], im_shape[0] - 1), 0)
         return boxes
 
+    # def multiscale(self, inp_size, gt_boxes, im):
+
+    #     if inp_size is not None:
+    #         w, h = inp_size
+
+    #         try:
+    #             gt_boxes[:, 0::2] *= float(w) / im.shape[1]
+    #             gt_boxes[:, 1::2] *= float(h) / im.shape[0]
+    #         except IndexError:
+    #             print(gt_boxes.shape)
+    #             sys.exit(1)
+    #         im = cv2.resize(im, (h, w))
+    #     print(im.shape)
+    #     return gt_boxes, im
+
     def multiscale(self, inp_size, gt_boxes, im):
 
         if inp_size is not None:
-            w, h = inp_size
+            _, scale = inp_size
+            h, w = im.shape[:2]
+
+            if h > w:
+                new_h, new_w = scale * h / w, scale
+
+            elif w > h:
+                new_h, new_w = scale, scale * w / h
+            else:
+                new_h, new_w = scale, scale
 
             try:
-                gt_boxes[:, 0::2] *= float(w) / im.shape[1]
-                gt_boxes[:, 1::2] *= float(h) / im.shape[0]
+                gt_boxes[:, 0::2] *= int(float(new_w) / im.shape[1])
+                gt_boxes[:, 1::2] *= int(float(new_h) / im.shape[0])
             except IndexError:
                 print(gt_boxes.shape)
                 sys.exit(1)
-            im = cv2.resize(im, (h, w))
-
+            im = cv2.resize(im, (new_h, new_w))
+            # print(im.shape)
         return gt_boxes, im
 
     def flip(self, im, boxes):
@@ -139,13 +163,20 @@ class dataset(data.Dataset):
 
         h, w = im.shape[:2]
         new_h, new_w = output_size
-
-        top = np.random.randint(0, h - new_h)
-        left = np.random.randint(0, w - new_w)
+        if h != new_h:
+            top = np.random.randint(0, h - new_h)
+        else:
+            top = 0
+        if w != new_w:
+            left = np.random.randint(0, w - new_w)
+        else:
+            left = 0
 
         im = im[top: top + new_h, left: left + new_w]
+        # print(im)
 
         gt_boxes = gt_boxes - [left, top, left, top]
+        # print(im.shape)
 
         return im, gt_boxes
 
@@ -242,7 +273,7 @@ class dataset(data.Dataset):
             ths[ith].start()
         for ith in range(lenindex):
             ths[ith].join()
-
+        # print(self.batch['images'])
         self.batch['images'] = np.asarray(self.batch['images'], dtype=np.float64)
 
         # self.batch = self.to_tensor()

@@ -112,10 +112,10 @@ if __name__ == '__main__':
     optimizable = net.conv5.parameters  # this is always the case whether transfer or not
     # net.cuda()
     # net = torch.nn.DataParallel(net)
-
+    # device = torch.device("cuda:0")
+    # net.to(device)
     # net = torch.nn.DataParallel(net, device_ids=list(range(torch.cuda.device_count())))
     net.cuda()
-
     optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
     print('this')
     # tensorboard
@@ -193,7 +193,7 @@ if __name__ == '__main__':
                 cnt = 0
                 t.clear()
 
-        if step % cfg.lr_decay_epochs == 1:
+        if step in cfg.lr_decay_epochs:
             lr *= cfg.lr_decay
             optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
 

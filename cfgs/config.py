@@ -16,6 +16,8 @@ def mkdir(path, max_depth=3):
 
 # input and output size
 ############################
+
+
 multi_scale_inp_size = [np.array([320, 320], dtype=np.int),
                         np.array([352, 352], dtype=np.int),
                         np.array([384, 384], dtype=np.int),

@@ -38,7 +38,6 @@ def _make_layers(in_channels, net_cfg):
 
 
 def _process_batch(data, size_index):
-
     W, H = cfg.multi_scale_out_size[size_index]
     inp_size = cfg.multi_scale_inp_size[size_index]
     out_size = cfg.multi_scale_out_size[size_index]
@@ -265,7 +264,7 @@ class Darknet19(nn.Module):
 
         bsize = bbox_pred_np.shape[0]
 
-        targets = self.pool.map(partial(_process_batch, size_index=size_index),
+        targets = self.pool.map(partial(_process_batch, size_index=0),
                                 ((bbox_pred_np[b], gt_boxes[b],
                                   gt_classes[b], dontcare[b], iou_pred_np[b])
                                  for b in range(bsize)))
