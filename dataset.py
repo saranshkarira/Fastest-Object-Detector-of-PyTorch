@@ -1,112 +1,287 @@
-import pickle
-import uuid
-import xml.etree.ElementTree as ET
-from torch.utils.data import Dataset
+# DataSet Barebone
+
+import torch.utils.data as data
 
 import numpy as np
+
+import cv2
+
+import json
+import lmdb
+
+# from utils.im_transform put your transforms here
+import threading
+
+import sys
+from cfgs import config as cfg
+import time
 import os
-import scipy.sparse
-
-from .imdb import ImageDataset
-from .voc_eval import voc_eval
-from .imdb import image_resize
+from eval_voc import voc_eval
+import pickle
 
 
-# from functools import partial
+class dataset(data.Dataset):
+    def __init__(self, target_file, root_dir, multiscale, train=True):  # , transforms=True):
+        """
+        Args:
+            target_file (string): Path to the target file with annotations.
+            root_dir (string): Directory with all the images.
+            transform (callable, optional): Optional transform to be applied
+                on a sample.
+        """
+        self.crop = 320
+        self.root_dir = root_dir
+        self.train = train
+        self.eval_name = str(time.time()) + '{}.txt'
+        self.year = 2007  # eval metric
 
+        self.env = lmdb.open(root_dir, max_readers=5, readonly=True, lock=False, readahead=False, meminit=False)
+        self.txn = self.env.begin(write=False)
+        self.length = self.txn.stat()['entries'] - 4  # for mapping
 
-# from utils.yolo import preprocess_train
-
-
-class VOCDataset(ImageDataset, Dataset):
-    def __init__(self, imdb_name, datadir, batch_size, im_processor,
-                 processes=3, shuffle=True, dst_size=None, classes=None, n_classes=None):
-        ImageDataset.__init__(self, imdb_name, datadir, batch_size, im_processor, processes, shuffle, dst_size)
-        Dataset.__init__(self)
-        meta = imdb_name.split('_')
-        self._year = meta[1]
-        self._image_set = meta[2]
-        self._devkit_path = os.path.join(datadir, 'VOCdevkit{}'.format(self._year))
-        self._data_path = os.path.join(self._devkit_path, 'VOC{}'.format(self._year))
-        assert os.path.exists(self._devkit_path), 'VOCdevkit path does not exist: {}'.format(self._devkit_path)
-        assert os.path.exists(self._data_path), 'Path does not exist: {}'.format(self._data_path)
-
+        classes = None
         if classes is None:
-            self._classes = ('aeroplane', 'bicycle', 'bird', 'boat',
-                             'bottle', 'bus', 'car', 'cat', 'chair',
-                             'cow', 'diningtable', 'dog', 'horse',
-                             'motorbike', 'person', 'pottedplant',
-                             'sheep', 'sofa', 'train', 'tvmonitor')
+            self.classes = {'Weapon', 'Vehicle', 'Building', 'People'}
         else:
-            self._classes = classes
+            self.classes = classes
 
-        if n_classes is not None:
-            self._classes = self._classes[:n_classes]
+        self.class_map = {'Weapon': [0], 'Vehicle': [1], 'Building': [2], 'People': [3]}
 
-        self._class_to_ind = dict(list(zip(self.classes, list(range(self.num_classes)))))
-        self._image_ext = '.jpg'
+        with open(target_file) as opener:
+            self.targets = json.load(opener)
 
-        self._salt = str(uuid.uuid4())
-        self._comp_id = 'comp4'
-
-        # PASCAL specific config options
-        self.config = {'cleanup': True, 'use_salt': True}
-
-        self.load_dataset()
-        # self.im_processor = partial(process_im,
-        #     image_names=self._image_names, annotations=self._annotations)
-        # self.im_processor = preprocess_train
+        self.dst_size = multiscale
+        # self.sample = {'image': [], 'gt_boxes': [], 'gt_classes': [], 'dontcare': []}
+    # len
 
     def __len__(self):
-        return len(self._image_indexes)
 
-    def __getitem__(self, index):
-        return index
+        return self.length
+    # getitem
 
-    # ===== Start =====
+    def __getitem__(self, idx):
+        return idx
 
-    def fetch_betch_data(self, ith, x, size_index):
-        images, gt_boxes, classes, dontcare, origin_im = self._im_processor(
-            [self.image_names[x], self.get_annotation(x), self.dst_size], None)
+    # ### START #####
 
-        # multi-scale
-        w, h = cfg.multi_scale_inp_size[size_index]
-        gt_boxes = np.asarray(gt_boxes, dtype=np.float)
-        if len(gt_boxes) > 0:  # !!already applied in pre-process
-            gt_boxes[:, 0::2] *= float(w) / images.shape[1]
-            gt_boxes[:, 1::2] *= float(h) / images.shape[0]
-        images = cv2.resize(images, (w, h))
+    def imcv2_recolor(self, im, a=.1):
 
+        t = np.random.uniform(-1, 1, 3)
+
+        # random amplify each channel
+        im = im.astype(np.float)
+        im *= (1 + t * a)  # (* 1.0x, x is a random value)
+        mx = 255. * (1 + a)
+        up = np.random.uniform(-1, 1)
+        im = np.power(im / mx, 1. + up * .5)
+        # return np.array(im * 255., np.uint8)
+        return im
+
+    def clip_boxes(self, boxes, im_shape):
+        """
+        Clip boxes to image boundaries.
+        """
+        if boxes.shape[0] == 0:
+            return boxes
+
+        # x1 >= 0
+        boxes[:, 0::4] = np.maximum(np.minimum(boxes[:, 0::4], im_shape[1] - 1), 0)
+        # y1 >= 0
+        boxes[:, 1::4] = np.maximum(np.minimum(boxes[:, 1::4], im_shape[0] - 1), 0)
+        # x2 < im_shape[1]
+        boxes[:, 2::4] = np.maximum(np.minimum(boxes[:, 2::4], im_shape[1] - 1), 0)
+        # y2 < im_shape[0]
+        boxes[:, 3::4] = np.maximum(np.minimum(boxes[:, 3::4], im_shape[0] - 1), 0)
+        return boxes
+
+    # def multiscale(self, inp_size, gt_boxes, im):
+
+    #     if inp_size is not None:
+    #         w, h = inp_size
+
+    #         try:
+    #             gt_boxes[:, 0::2] *= float(w) / im.shape[1]
+    #             gt_boxes[:, 1::2] *= float(h) / im.shape[0]
+    #         except IndexError:
+    #             print(gt_boxes.shape)
+    #             sys.exit(1)
+    #         im = cv2.resize(im, (h, w))
+    #     print(im.shape)
+    #     return gt_boxes, im
+
+    def multiscale(self, inp_size, gt_boxes, im):
+
+        if inp_size is not None:
+            _, scale = inp_size
+            h, w = im.shape[:2]
+
+            if h > w:
+                new_h, new_w = scale * h / w, scale
+
+            elif w > h:
+                new_h, new_w = scale, scale * w / h
+            else:
+                new_h, new_w = scale, scale
+
+            try:
+                gt_boxes[:, 0::2] *= int(float(new_w) / im.shape[1])
+                gt_boxes[:, 1::2] *= int(float(new_h) / im.shape[0])
+            except IndexError:
+                print(gt_boxes.shape)
+                sys.exit(1)
+            im = cv2.resize(im, (new_h, new_w))
+            # print(im.shape)
+        return gt_boxes, im
+
+    def flip(self, im, boxes):
+        if len(boxes) == 0:
+            return boxes
+
+        boxes = boxes
+
+        flip = np.random.uniform() > 0.5
+        if flip:
+            im = cv2.flip(im, 1)
+            boxes_x = np.copy(boxes[:, 0])
+            boxes[:, 0] = im.shape[1] - boxes[:, 2]
+            boxes[:, 2] = im.shape[1] - boxes_x
+
+        return im, boxes
+
+    def random_crop(self, output_size, im, gt_boxes):
+        """Crop randomly the image in a sample.
+
+        Args:
+            output_size (tuple or int): Desired output size. If int, square crop
+                is made.
+        """
+        assert isinstance(output_size, (int, tuple))
+        if isinstance(output_size, int):
+            output_size = (output_size, output_size)
+        else:
+            assert len(output_size) == 2
+
+        h, w = im.shape[:2]
+        new_h, new_w = output_size
+        if h != new_h:
+            top = np.random.randint(0, h - new_h)
+        else:
+            top = 0
+        if w != new_w:
+            left = np.random.randint(0, w - new_w)
+        else:
+            left = 0
+
+        im = im[top: top + new_h, left: left + new_w]
+        # print(im)
+
+        gt_boxes = gt_boxes - [left, top, left, top]
+        # print(im.shape)
+
+        return im, gt_boxes
+
+    def get_annots(self, index):
+        gt_boxes = []
+        gt_classes = []
+        # image_id = self.targets[index]['Var1'].split('/')[-1].encode()
+        for k, v in self.targets[index].iteritems():
+
+            if k == 'Var1':
+                image_id = v.split('/')[-1]
+
+            elif len(v) == 0:
+                pass
+
+            elif isinstance(v[0], (int)):
+                gt_boxes.append(v)
+                gt_classes.append(self.class_map[k])
+
+            elif isinstance(v[0], (list)):
+                for anns in v:
+                    gt_boxes.append(anns)
+                    gt_classes.append(self.class_map[k])
+
+        return image_id, gt_boxes, gt_classes
+
+    def preprocess_train(self, index, size_index, multi_scale_inp_size):
+
+        inp_size = multi_scale_inp_size[size_index]
+
+        image_id, gt_boxes, gt_classes = self.get_annots(index)
+
+        # use map function here
+        with self.txn.cursor() as cursor:  # cannot append before preprocess
+            im = cursor.get(image_id.encode())  # check cursor for list parsing #append because we are getting images manually now
+
+        im = cv2.imdecode(np.fromstring(im, dtype=np.uint8), 1)
+
+        # transforms:
+
+        ori_im = np.copy(im)
+
+        gt_boxes = np.asarray(gt_boxes, dtype=np.float64)
+        gt_boxes, im = self.multiscale(inp_size, gt_boxes, im)
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+
+        # Don't run tfms below during eval/test
+        if self.train:
+            if self.crop:
+                im, gt_boxes = self.random_crop(self.crop, im, gt_boxes)
+
+            im, gt_boxes = self.flip(im, gt_boxes)
+
+            im = self.imcv2_recolor(im)
+
+            gt_boxes = self.clip_boxes(gt_boxes, im.shape)
+
+        return im, gt_boxes, gt_classes, [], ori_im
+
+    def fetch_batch(self, ith, index, size_index, dst_size):
+        images, gt_boxes, classes, dontcare, origin_im = self.preprocess_train(index, size_index, dst_size)
+        # print(ith)
         self.batch['images'][ith] = images
         self.batch['gt_boxes'][ith] = gt_boxes
         self.batch['gt_classes'][ith] = classes
         self.batch['dontcare'][ith] = dontcare
         self.batch['origin_im'][ith] = origin_im
+        return 0
 
-    def parse(self, index, size_index):
+    # def to_tensor(self):
+    #     sample = self.batch
+    #     # swap color axis because
+    #     # numpy image: H x W x C
+    #     # torch image: C X H X W
+    #     # image = image.transpose((2, 0, 1))
+    #     return {'images': torch.Tensor(sample['images']),
+    #             'gt_boxes': torch.from_numpy(sample['gt_boxes']),
+    #             'gt_classes': torch.Tensor(sample['gt_classes']),
+    #             'dontcare': torch.from_numpy(np.asarray(sample['dontcare']))}
+
+    def fetch_parse(self, index, size_index):
         index = index.numpy()
         lenindex = len(index)
-        self.batch = {'images': [list()] * lenindex,  # !!list() should initialize len
+        self.batch = {'images': [list()] * lenindex,
                       'gt_boxes': [list()] * lenindex,
                       'gt_classes': [list()] * lenindex,
                       'dontcare': [list()] * lenindex,
                       'origin_im': [list()] * lenindex}
+
         ths = []
+
         for ith in range(lenindex):
-            ths.append(threading.Thread(target=self.fetch_betch_data, args=(ith, index[ith], size_index)))
+            ths.append(threading.Thread(target=self.fetch_batch, args=(ith, index[ith], size_index, self.dst_size)))
             ths[ith].start()
         for ith in range(lenindex):
             ths[ith].join()
-        self.batch['images'] = np.asarray(self.batch['images'])
+        # print(self.batch['images'])
+        self.batch['images'] = np.asarray(self.batch['images'], dtype=np.float64)
+
+        # self.batch = self.to_tensor()
         return self.batch
 
-    # ===== End =====
+    # ######END#######
 
-    def load_dataset(self):
-        # set self._image_index and self._annotations
-        self._image_indexes = self._load_image_set_index()
-        self._image_names = [self.image_path_from_index(index) for index in self.image_indexes]
-        self._annotations = self._load_pascal_annotations()
+    # ######START EVAL#######
 
     def evaluate_detections(self, all_boxes, output_dir=None):
         """
@@ -119,160 +294,47 @@ class VOCDataset(ImageDataset, Dataset):
         """
         self._write_voc_results_file(all_boxes)
         self._do_python_eval(output_dir)
-        if self.config['cleanup']:
-            for cls in self._classes:
-                if cls == '__background__':
-                    continue
-                filename = self._get_voc_results_file_template().format(cls)
-                os.remove(filename)
-
-    # -------------------------------------------------------------
-    def image_path_from_index(self, index):
-        """
-        Construct an image path from the image's "index" identifier.
-        """
-        image_path = os.path.join(self._data_path, 'JPEGImages', index + self._image_ext)
-        assert os.path.exists(image_path), 'Path does not exist: {}'.format(image_path)
-        return image_path
-
-    def _load_image_set_index(self):
-        """
-        Load the indexes listed in this dataset's image set file.
-        """
-        # Example path to image set file:
-        # self._devkit_path + /VOCdevkit2007/VOC2007/ImageSets/Main/val.txt
-        image_set_file = os.path.join(self._data_path, 'ImageSets', 'Main', self._image_set + '.txt')
-        assert os.path.exists(image_set_file), 'Path does not exist: {}'.format(image_set_file)
-        with open(image_set_file) as f:
-            image_index = [x.strip() for x in f.readlines()]
-        return image_index
-
-    def _load_pascal_annotations(self):
-        """
-        Return the database of ground-truth regions of interest.
-
-        This function loads/saves from/to a cache file to speed up
-        future calls.
-        """
-        cache_file = os.path.join(self.cache_path, self.name + '_gt_roidb.pkl')
-        if os.path.exists(cache_file):
-            with open(cache_file, 'rb') as fid:
-                roidb = pickle.load(fid)
-            print('{} gt roidb loaded from {}'.format(self.name, cache_file))
-            return roidb
-
-        gt_roidb = [self._annotation_from_index(index) for index in self.image_indexes]
-        with open(cache_file, 'wb') as fid:
-            pickle.dump(gt_roidb, fid, pickle.HIGHEST_PROTOCOL)
-        print('wrote gt roidb to {}'.format(cache_file))
-
-        return gt_roidb
-
-    def _annotation_from_index(self, index):
-        """
-        Load image and bounding boxes info from XML file in the PASCAL VOC
-        format.
-        """
-        filename = os.path.join(self._data_path, 'Annotations', index + '.xml')
-        tree = ET.parse(filename)
-        objs = tree.findall('object')
-        # if not self.config['use_diff']:
-        #     # Exclude the samples labeled as difficult
-        #     non_diff_objs = [
-        #         obj for obj in objs if int(obj.find('difficult').text) == 0]
-        #     # if len(non_diff_objs) != len(objs):
-        #     #     print 'Removed {} difficult objects'.format(
-        #     #         len(objs) - len(non_diff_objs))
-        #     objs = non_diff_objs
-        num_objs = len(objs)
-
-        boxes = np.zeros((num_objs, 4), dtype=np.uint16)
-        gt_classes = np.zeros((num_objs), dtype=np.int32)
-        overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
-        # "Seg" area for pascal is just the box area
-        seg_areas = np.zeros((num_objs), dtype=np.float32)
-        ishards = np.zeros((num_objs), dtype=np.int32)
-
-        # Load object bounding boxes into a data frame.
-        for ix, obj in enumerate(objs):
-            bbox = obj.find('bndbox')
-            # Make pixel indexes 0-based
-            x1 = float(bbox.find('xmin').text) - 1
-            y1 = float(bbox.find('ymin').text) - 1
-            x2 = float(bbox.find('xmax').text) - 1
-            y2 = float(bbox.find('ymax').text) - 1
-
-            diffc = obj.find('difficult')
-            difficult = 0 if diffc is None else int(diffc.text)
-            ishards[ix] = difficult
-
-            cls = self._class_to_ind[obj.find('name').text.lower().strip()]
-            boxes[ix, :] = [x1, y1, x2, y2]
-            gt_classes[ix] = cls
-            overlaps[ix, cls] = 1.0
-            seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
-
-        overlaps = scipy.sparse.csr_matrix(overlaps)
-
-        return {'boxes': boxes,
-                'gt_classes': gt_classes,
-                'gt_ishard': ishards,
-                'gt_overlaps': overlaps,
-                'flipped': False,
-                'seg_areas': seg_areas}
-
-    def _get_voc_results_file_template(self):
-        # VOCdevkit/results/VOC2007/Main/<comp_id>_det_test_aeroplane.txt
-        filename = self._get_comp_id() + '_det_' + self._image_set + '_{:s}.txt'
-        filedir = os.path.join(self._devkit_path, 'results', 'VOC' + self._year, 'Main')
-        if not os.path.exists(filedir):
-            os.makedirs(filedir)
-        path = os.path.join(filedir, filename)
-        return path
+        # if self.config['cleanup']:
+        #     for cls in self._classes:
+        #         if cls == '__background__':
+        #             continue
+        #         filename = self._get_voc_results_file_template().format(cls)
+        #         os.remove(filename)
 
     def _write_voc_results_file(self, all_boxes):
         for cls_ind, cls in enumerate(self.classes):
             if cls == '__background__':
                 continue
             print('Writing {} VOC results file'.format(cls))
-            filename = self._get_voc_results_file_template().format(cls)
+            filename = self.eval_name.format(cls)
             with open(filename, 'wt') as f:
-                for im_ind, index in enumerate(self.image_indexes):
-                    dets = all_boxes[cls_ind][im_ind]
+                for index in range(self.length):
+                    dets = all_boxes[cls_ind][index]
                     if dets == []:
                         continue
                     # the VOCdevkit expects 1-based indices
+                    image_id = self.targets[index]['Var1'].split('/')[-1]
                     for k in range(dets.shape[0]):
                         f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
-                                format(index, dets[k, -1],
+                                format(image_id, dets[k, -1],
                                        dets[k, 0] + 1, dets[k, 1] + 1,
                                        dets[k, 2] + 1, dets[k, 3] + 1))
 
     def _do_python_eval(self, output_dir='output'):
-        annopath = os.path.join(
-            self._devkit_path,
-            'VOC' + self._year,
-            'Annotations',
-            '{:s}.xml')
-        imagesetfile = os.path.join(
-            self._devkit_path,
-            'VOC' + self._year,
-            'ImageSets',
-            'Main',
-            self._image_set + '.txt')
-        cachedir = os.path.join(self._devkit_path, 'annotations_cache')
+        annopath = cfg.target_file
+        cachedir = os.path.join(cfg.TEST_DIR, 'annotations_cache')
         aps = []
         # The PASCAL VOC metric changed in 2010
-        use_07_metric = True if int(self._year) < 2010 else False
+        use_07_metric = True if int(self.year) < 2010 else False
         print('VOC07 metric? ' + ('Yes' if use_07_metric else 'No'))
         if output_dir is not None and not os.path.isdir(output_dir):
             os.mkdir(output_dir)
-        for i, cls in enumerate(self._classes):
+        for i, cls in enumerate(self.classes):
             if cls == '__background__':
                 continue
-            filename = self._get_voc_results_file_template().format(cls)
+            filename = self.eval_name.format(cls)
             rec, prec, ap = voc_eval(
-                filename, annopath, imagesetfile, cls, cachedir, ovthresh=0.5,
+                filename, annopath, cls, cachedir, ovthresh=0.5,
                 use_07_metric=use_07_metric)
             aps += [ap]
             print(('AP for {} = {:.4f}'.format(cls, ap)))
@@ -290,11 +352,4 @@ class VOCDataset(ImageDataset, Dataset):
         print('--------------------------------------------------------------')
         print('Results computed with the **unofficial** Python eval code.')
         print('Results should be very close to the official MATLAB eval code.')
-        print('Recompute with `./tools/reval.py --matlab ...` for your paper.')
-        print('-- Thanks, The Management')
         print('--------------------------------------------------------------')
-
-    def _get_comp_id(self):
-        comp_id = (self._comp_id + '_' + self._salt if self.config['use_salt']
-                   else self._comp_id)
-        return comp_id

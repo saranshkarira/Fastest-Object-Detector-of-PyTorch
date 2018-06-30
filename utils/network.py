@@ -61,9 +61,10 @@ class FC(nn.Module):
 # Non pep8 to import h5py this way
 
 
-def save_net(fname, net):
+def save_net(counter, exp_name, epoch, lr, fname, net):
     import h5py  # Opening file in write mode/Creating one
     h5f = h5py.File(fname, mode='w')
+    h5f.create_dataset('exp_params', data=np.array([counter, exp_name, epoch, lr]))
     for k, v in list(net.state_dict().items()):
         h5f.create_dataset(k, data=v.cpu().numpy())  # writing dataset with k as keyname and v after converting
         # it to cpu and numpy array
@@ -72,9 +73,11 @@ def save_net(fname, net):
 def load_net(fname, net):
     import h5py
     h5f = h5py.File(fname, mode='r')  # mode 'r' opens the file in read mode
+    # print(str(h5f['exp_name']), 'I am the god of thunder')
     for k, v in list(net.state_dict().items()):
         param = torch.from_numpy(np.asarray(h5f[k]))
         v.copy_(param)
+    return h5f['exp_params']
 
 
 def load_pretrained_npy(faster_rcnn_model, fname):
@@ -111,10 +114,7 @@ def load_pretrained_npy(faster_rcnn_model, fname):
 
 
 def np_to_variable(x, is_cuda=True, dtype=torch.FloatTensor, volatile=False):
-    try:
-        v = Variable(torch.from_numpy(x).type(dtype), volatile=volatile)
-    except:
-        print(x.dtype, x, 'I broke the code')
+    v = Variable(torch.from_numpy(x).type(dtype), volatile=volatile)
     if is_cuda:
         v = v.cuda()
     return v

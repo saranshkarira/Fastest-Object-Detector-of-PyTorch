@@ -1,0 +1,5 @@
+db/
+models/
+darknet.pyc dataset.pyc eval_voc.pyc
+darknet.pyc dataset.pyc eval_voc.pyc
+__pycache__

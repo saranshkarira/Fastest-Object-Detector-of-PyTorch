@@ -1,11 +1,10 @@
 import os
 from .config_vmr import *  # noqa
 from .exps.darknet19_exp1 import *  # noqa
+import glob
 
 
-# import per experiments based parameters
-
-
+# creates non existing directories
 def mkdir(path, max_depth=3):
     parent, child = os.path.split(path)
     if not os.path.exists(parent) and max_depth > 1:
@@ -17,6 +16,8 @@ def mkdir(path, max_depth=3):
 
 # input and output size
 ############################
+
+
 multi_scale_inp_size = [np.array([320, 320], dtype=np.int),
                         np.array([352, 352], dtype=np.int),
                         np.array([384, 384], dtype=np.int),
@@ -66,24 +67,51 @@ thresh = 0.3
 # dir config
 ############################
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-DATA_DIR = os.path.join(ROOT_DIR, 'data')
+DATA_DIR = os.path.join(ROOT_DIR, 'db')
 MODEL_DIR = os.path.join(ROOT_DIR, 'models')
 TRAIN_DIR = os.path.join(MODEL_DIR, 'training')
 TEST_DIR = os.path.join(MODEL_DIR, 'testing')
 
-root_dir = os.path.join(ROOT_DIR, 'db', 'image_data')
-target_file = os.path.join(ROOT_DIR, 'db', 'targets', 'encoded.json')
+root_dir = os.path.join(DATA_DIR, 'image_data')
+target_file = glob.glob(os.path.join(DATA_DIR, 'targets', '*.json'))[0]
 transforms = False
 
-trained_model = os.path.join(MODEL_DIR, h5_fname)
-pretrained_model = os.path.join(MODEL_DIR, pretrained_fname)
-train_output_dir = os.path.join(TRAIN_DIR, exp_name)
-test_output_dir = os.path.join(TEST_DIR, imdb_test, h5_fname)
-mkdir(train_output_dir, max_depth=3)
-# mkdir(test_output_dir, max_depth=4)
+# gets the latest file from the latest experiment and returns its abs path
+
+
+def trained_model():
+    exp_name = str(sorted([int(i.split('/')[-1]) for i in glob.glob(os.path.join(TRAIN_DIR, 'checkpoints', '*'))])[-1])
+    trained_model = glob.glob(os.path.join(TRAIN_DIR, 'checkpoints', exp_name, '*.h5'))
+    split_key = []
+    split_dict = {}
+    for elements in trained_model:
+        jamba = int((elements.split('/')[-1]).split('.')[0])
+        split_key.append(jamba)
+        split_dict[jamba] = elements
+
+    return split_dict[sorted(split_key)[-1]]
+
+
+# Cleans all checkpoint except latest n no, n =  remain
+def clean_ckpts(train_dir):
+    remain = 4
+    ckpts = dict(map(lambda x: (int(x.split('/')[-1].split('.')[0]), x), glob.glob(os.path.join(train_dir, '*'))))
+    samba = sorted(ckpts.keys())
+    samba = samba[:(len(samba) - remain)]
+    for key in samba:
+        os.remove(ckpts[key])
+    # just to ensure we hit the jackpot
+    print('remaining checkpoints are {}'.format(map(lambda x: x.split('/')[-1], glob.glob(os.path.join(train_dir, '*')))))
+
+
+# get the pretrained model(The one we apply transfer learning on)
+pretrained_model = glob.glob(os.path.join(MODEL_DIR, '*.npz'))[0]
+
 
 rand_seed = 1024
 use_tensorboard = True
 
-log_interval = 50
+log_interval = 10
 disp_interval = 10
+
+lmdb = 1

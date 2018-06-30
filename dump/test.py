@@ -8,16 +8,13 @@ from darknet import Darknet19
 import utils.yolo as yolo_utils
 import utils.network as net_utils
 from utils.timer import Timer
-# from datasets.pascal_voc import VOCDataset
+from datasets.pascal_voc import VOCDataset
 import cfgs.config as cfg
-from dataset import dataset as dset
 
 
-# Unused anyway
 def preprocess(fname):
     # return fname
     image = cv2.imread(fname)
-    # use this instead of preprocess train but it does not rescale gTruths
     im_data = np.expand_dims(yolo_utils.preprocess_test(image, cfg.multi_scale_inp_size), 0)  # noqa
     return image, im_data
 
@@ -31,9 +28,11 @@ args = parser.parse_args()
 
 # hyper-parameters
 # ------------
-
-
-output_dir = os.path.join(cfg.DATA_DIR, 'detections')
+imdb_name = cfg.imdb_test
+# trained_model = cfg.trained_model
+trained_model = os.path.join(cfg.train_output_dir,
+                             'darknet19_voc07trainval_exp3_118.h5')
+output_dir = cfg.test_output_dir
 
 max_per_image = 300
 thresh = 0.01
@@ -41,30 +40,29 @@ vis = False
 # ------------
 
 
-def test_net(net, dataloader, max_per_image=300, thresh=0.5, vis=False, dataset):
-    x, _ = enumerate(dataloader)
-    num_images = len(x)
+def test_net(net, imdb, max_per_image=300, thresh=0.5, vis=False):
+    num_images = imdb.num_images
 
     # all detections are collected into:
     #    all_boxes[cls][image] = N x 5 array of detections in
     #    (x1, y1, x2, y2, score)
     all_boxes = [[[] for _ in range(num_images)]
-                 for _ in range(len(dataset.classes))]  # classes is in dataset actually
+                 for _ in range(imdb.num_classes)]
 
     # timers
     _t = {'im_detect': Timer(), 'misc': Timer()}
     det_file = os.path.join(output_dir, 'detections.pkl')
     size_index = args.image_size_index
 
-    for index, batch_index in enumerate(dataloader):
+    for i in range(num_images):
 
-        batch = dataset.fetch_parse(batch_index, size_index=size_index)  # How to pass size index
+        batch = imdb.next_batch(size_index=size_index)
         ori_im = batch['origin_im'][0]
         im_data = net_utils.np_to_variable(batch['images'], is_cuda=True,
                                            volatile=True).permute(0, 3, 1, 2)
 
         _t['im_detect'].tic()
-        bbox_pred, iou_pred, prob_pred = net(im_data)  # compare for arguments
+        bbox_pred, iou_pred, prob_pred = net(im_data)
 
         # to numpy
         bbox_pred = bbox_pred.data.cpu().numpy()
@@ -83,7 +81,7 @@ def test_net(net, dataloader, max_per_image=300, thresh=0.5, vis=False, dataset)
 
         _t['misc'].tic()
 
-        for j in range(len(dataset.classes)):
+        for j in range(imdb.num_classes):
             inds = np.where(cls_inds == j)[0]
             if len(inds) == 0:
                 all_boxes[j][i] = np.empty([0, 5], dtype=np.float32)
@@ -98,10 +96,10 @@ def test_net(net, dataloader, max_per_image=300, thresh=0.5, vis=False, dataset)
         # Limit to max_per_image detections *over all classes*
         if max_per_image > 0:
             image_scores = np.hstack([all_boxes[j][i][:, -1]
-                                      for j in range(len(dataset.classes))])
+                                      for j in range(imdb.num_classes)])
             if len(image_scores) > max_per_image:
                 image_thresh = np.sort(image_scores)[-max_per_image]
-                for j in range(1, len(dataset.classes)):
+                for j in range(1, imdb.num_classes):
                     keep = np.where(all_boxes[j][i][:, -1] >= image_thresh)[0]
                     all_boxes[j][i] = all_boxes[j][i][keep, :]
         nms_time = _t['misc'].toc()
@@ -128,18 +126,21 @@ def test_net(net, dataloader, max_per_image=300, thresh=0.5, vis=False, dataset)
         pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
 
     print('Evaluating detections')
-    dataset.evaluate_detections(all_boxes, output_dir)
+    imdb.evaluate_detections(all_boxes, output_dir)
 
 
 if __name__ == '__main__':
     # data loader
-    dataset = dset(cfg.eval_target_file, cfg.eval_root_dir, cfg.multi_scale_inp_size, train=False)  # , cfg.transforms)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch, shuffle=False, num_workers=args.workers)
+    imdb = VOCDataset(imdb_name, cfg.DATA_DIR, cfg.batch_size,
+                      yolo_utils.preprocess_test,
+                      processes=2, shuffle=False, dst_size=cfg.multi_scale_inp_size)
 
     net = Darknet19()
-    net_utils.load_net(cfg.trained_model(), net)
+    net_utils.load_net(trained_model, net)
 
     net.cuda()
     net.eval()
 
-    test_net(net, dataloader, max_per_image, thresh, vis, dataset)
+    test_net(net, imdb, max_per_image, thresh, vis)
+
+    imdb.close()

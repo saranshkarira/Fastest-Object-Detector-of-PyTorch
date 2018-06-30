@@ -38,7 +38,6 @@ def _make_layers(in_channels, net_cfg):
 
 
 def _process_batch(data, size_index):
-
     W, H = cfg.multi_scale_out_size[size_index]
     inp_size = cfg.multi_scale_inp_size[size_index]
     out_size = cfg.multi_scale_out_size[size_index]
@@ -82,7 +81,7 @@ def _process_batch(data, size_index):
         np.ascontiguousarray(gt_boxes_b, dtype=np.float)
     )
     ###
-    print(ious)
+    # print(ious)
     best_ious = np.max(ious, axis=1).reshape(_iou_mask.shape)
     # !
     iou_penalty = 0 - iou_pred_np[best_ious < cfg.iou_thresh]
@@ -117,8 +116,8 @@ def _process_batch(data, size_index):
     ious_reshaped = np.reshape(ious, [hw, num_anchors, len(cell_inds)])
     for i, cell_ind in enumerate(cell_inds):
         if cell_ind >= hw or cell_ind < 0:
-            print('cell inds size {}'.format(len(cell_inds)))
-            print('cell over {} hw {}'.format(cell_ind, hw))
+            # print('cell inds size {}'.format(len(cell_inds)))
+            # print('cell over {} hw {}'.format(cell_ind, hw))
             continue
         a = anchor_inds[i]
 
@@ -142,7 +141,7 @@ def _process_batch(data, size_index):
 
 
 class Darknet19(nn.Module):
-    def __init__(self):
+    def __init__(self, classes):
         super(Darknet19, self).__init__()
 
         net_cfgs = [
@@ -174,7 +173,7 @@ class Darknet19(nn.Module):
         self.conv4, c4 = _make_layers((c1 * (stride * stride) + c3), net_cfgs[7])
 
         # linear
-        out_channels = cfg.num_anchors * (cfg.num_classes + 5)
+        out_channels = cfg.num_anchors * (classes + 5)
         self.conv5 = net_utils.Conv2d(c4, out_channels, 1, 1, relu=False)
         self.global_average_pool = nn.AvgPool2d((1, 1))
 
@@ -188,8 +187,9 @@ class Darknet19(nn.Module):
     def loss(self):
         return self.bbox_loss + self.iou_loss + self.cls_loss
 
-    def forward(self, im_data, gt_boxes=None, gt_classes=None, dontcare=None,
-                size_index=0):
+    def forward(self, im_data, gt_boxes, gt_classes, dontcare,
+                size_index):
+        # print(size_index)
         conv1s = self.conv1s(im_data)
         conv2 = self.conv2(conv1s)
         conv3 = self.conv3(conv2)
@@ -215,12 +215,15 @@ class Darknet19(nn.Module):
         iou_pred = F.sigmoid(global_average_pool_reshaped[:, :, :, 4:5])
 
         score_pred = global_average_pool_reshaped[:, :, :, 5:].contiguous()
-        prob_pred = F.softmax(score_pred.view(-1, score_pred.size()[-1])).view_as(score_pred)  # noqa
 
+        prob_pred = F.softmax(score_pred.view(-1, score_pred.size()[-1])).view_as(score_pred)  # noqa
+        # print(score_pred.view(-1, score_pred.size()[-1]))
         # for training
         if self.training:
+
             bbox_pred_np = bbox_pred.data.cpu().numpy()
             iou_pred_np = iou_pred.data.cpu().numpy()
+            # print('1')
             _boxes, _ious, _classes, _box_mask, _iou_mask, _class_mask = \
                 self._build_target(bbox_pred_np,
                                    gt_boxes,
@@ -228,7 +231,7 @@ class Darknet19(nn.Module):
                                    dontcare,
                                    iou_pred_np,
                                    size_index)
-
+            # print('2')
             _boxes = net_utils.np_to_variable(_boxes)
             _ious = net_utils.np_to_variable(_ious)
             _classes = net_utils.np_to_variable(_classes)
@@ -240,7 +243,7 @@ class Darknet19(nn.Module):
                                                   dtype=torch.FloatTensor)
 
             num_boxes = sum((len(boxes) for boxes in gt_boxes))
-            print(num_boxes, 'here are the number of boxes')
+            # print(num_boxes, 'here are the number of boxes')
             # _boxes[:, :, :, 2:4] = torch.log(_boxes[:, :, :, 2:4])
             box_mask = box_mask.expand_as(_boxes)
 
@@ -261,7 +264,7 @@ class Darknet19(nn.Module):
 
         bsize = bbox_pred_np.shape[0]
 
-        targets = self.pool.map(partial(_process_batch, size_index=size_index),
+        targets = self.pool.map(partial(_process_batch, size_index=0),
                                 ((bbox_pred_np[b], gt_boxes[b],
                                   gt_classes[b], dontcare[b], iou_pred_np[b])
                                  for b in range(bsize)))
