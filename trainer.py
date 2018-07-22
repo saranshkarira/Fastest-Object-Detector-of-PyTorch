@@ -1,34 +1,37 @@
-import torch
-
-
-import cfgs.config as cfg  # make a common config file
+# General modules
 import os
 import sys
-
-
-import utils.network as net_utils  # THEY HAVE ALTERNATES
-
 import datetime
-from darknet import Darknet19 as Darknet
-from utils.timer import Timer
 from random import randint
-
-
-import torchvision
 import argparse
+import time
 
+# DL specific modules
+import torch
+import torchvision
 try:
     from tensorboardX import SummaryWriter
 except ImportError:
     SummaryWriter = None
 
+# Imports from within API
+import cfgs.config as cfg  # make a common config file
+import utils.network as net_utils  # THEY HAVE ALTERNATES
+from darknet import Darknet19 as Darknet
+from utils.timer import Timer
 from dataset import dataset as dset
-import time
 
 
+# Parse the Arguments
 def arg_parse():
     """
     Parse arguements to the training module
+    -i 'path/to/image_dir'
+    -w 'num of workers'
+    -b 'batch size'
+    -tl 'True/False' {activate transfer learning}
+    -c 'preferred yolo flavor'
+    -t 'True/False' {Use Tensorboard}
 
     """
 
@@ -52,9 +55,8 @@ def arg_parse():
 if __name__ == '__main__':
 
     args = arg_parse()
-    lmdb = 1
 
-    # Use LMDB or not
+    # Use LMDB custom dataset or VOC-style
     if cfg.lmdb:
         dataset = dset(cfg.target_file, cfg.root_dir, cfg.multi_scale_inp_size)  # , cfg.transforms)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch, shuffle=True, num_workers=args.workers)
@@ -64,10 +66,15 @@ if __name__ == '__main__':
         image_data = torchvision.datasets.ImageFolder(args.path)
         data_loader = torch.utils.data.DataLoader(image_data, batch_size=args.batch, shuffle=True, num_workers=args.workers, multiscale=cfg.multi_scale_inp_size)
 
+    # replace 4 with the number of classes in your custom dataset
     classes = 20 if args.transfer else 4
+
+    # create the network
     net = Darknet(classes)
 
-    # load from a checkpoint
+    # Load weights
+
+    # Loads pretrained yolo VOC weights
     if args.transfer:
         net.load_from_npz(cfg.pretrained_model, num_conv=18)
         exp_name = str(int(time.time()))  # For tensorboard consistency on reloads
@@ -75,6 +82,7 @@ if __name__ == '__main__':
         j = 0
         lr = cfg.init_learning_rate
 
+    # Loads from a latest saved checkpoint in case training takes place over multiple days.
     else:
         path_t = cfg.trained_model()
         if os.path.exists(path_t):
@@ -85,39 +93,48 @@ if __name__ == '__main__':
             e = 'no checkpoint to load from\n'
             sys.exit(e)
 
+    # To keep the tensorflow logs consistent in case training takes multiple days with a lot of start and stops
     path = os.path.join(cfg.TRAIN_DIR, 'runs', str(exp_name))
     if not os.path.exists(path):
         os.makedirs(path)
 
+    # Transfer learning
+    # Freeze all the parameters
+    for params in net.parameters():
+        params.requires_grad = False
+    # Replace the last conv5 module
     if args.transfer:
-        for params in net.parameters():
-            params.requires_grad = False
         shape = net.conv5.conv.weight.shape
         new_layer = net_utils.Conv2d(shape[1], 45, shape[2], 1, relu=False)
         net.conv5 = new_layer  # make it generalizable
-        for params in net.conv5.parameters():
-            params.requires_grad = True
+    # Unfreeze last module's params
+    for params in net.conv5.parameters():
+        params.requires_grad = True
 
         print('Tranfer Learning Active')
 
     # os.environ['CUDA_VISIBLE_DEVICES'] = 0, 1, 2
     # torch.cuda.manual_seed(seed)
     # net = torch.nn.DataParallel(net).cuda()
-    net.train()
 
+    net.train()
     print('network loaded')
 
-    # Optimizer
-
+    # Optimizer only optimizes 5th conv layer
     optimizable = net.conv5.parameters  # this is always the case whether transfer or not
+
     # net.cuda()
     # net = torch.nn.DataParallel(net)
     # device = torch.device("cuda:0")
     # net.to(device)
     # net = torch.nn.DataParallel(net, device_ids=list(range(torch.cuda.device_count())))
+
+    # Load the model on gpu
     net.cuda()
+
+    # SGD optimizer
     optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
-    print('this')
+
     # tensorboard
     if args.use_tensorboard and SummaryWriter is not None:
         summary_writer = SummaryWriter(path)
@@ -137,7 +154,9 @@ if __name__ == '__main__':
         for i, batch_of_index in enumerate(dataloader):
             t.tic()
 
-            # OG yolo changes scales every 10 epochs
+            # OG yoloV2 changes scales every 10 epochs
+            # Selecting index first thing than last otherwise one scale gets more trained than others due to multiple start-stops
+
             if i % 10 == 0:
                 size_index = randint(0, len(cfg.multi_scale_inp_size) - 1)
                 print('new scale is {}'.format(cfg.multi_scale_inp_size[size_index]))
@@ -149,18 +168,21 @@ if __name__ == '__main__':
             dontcare = batch['dontcare']
             origin_im = ['origin_im']
 
+            # sending images onto gpu after turning them into torch variable
             im = net_utils.np_to_variable(im,
                                           is_cuda=True,
                                           volatile=False).permute(0, 3, 1, 2)
 
             bbox_pred, iou_pred, prob_pred = net(im, gt_boxes, gt_classes, dontcare, size_index)
 
+            # accumulating mini-batch loss
             loss = net.loss
             bbox_loss += net.bbox_loss.data.cpu().numpy()[0]
             iou_loss += net.iou_loss.data.cpu().numpy()[0]
             cls_loss += net.cls_loss.data.cpu().numpy()[0]
-
             train_loss += loss.data.cpu().numpy()[0]
+
+            # clearing grads before calculating new ones and then updating wts
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -169,6 +191,7 @@ if __name__ == '__main__':
             j += 1
             duration = t.toc()
 
+            # print average loss of the mini-batch
             if cnt % cfg.disp_interval == 0:
 
                 train_loss /= cnt
@@ -182,6 +205,7 @@ if __name__ == '__main__':
                         iou_loss, cls_loss, duration,
                         str(datetime.timedelta(seconds=int((batch_per_epoch - step_cnt) * duration))))))
 
+                # write tensorboard logs of the average loss
                 summary_writer.add_scalar('loss_train', train_loss, j)
                 summary_writer.add_scalar('loss_bbox', bbox_loss, j)
                 summary_writer.add_scalar('loss_iou', iou_loss, j)
@@ -193,17 +217,21 @@ if __name__ == '__main__':
                 cnt = 0
                 t.clear()
 
+        # learning rate decay every said epochs
         if step in cfg.lr_decay_epochs:
             lr *= cfg.lr_decay
             optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
 
+        # write parameters and hyper-parameters to checkpoints
         train_output_dir = os.path.join(cfg.TRAIN_DIR, 'checkpoints', exp_name)
         cfg.mkdir(train_output_dir, max_depth=3)
         save_name = os.path.join(train_output_dir, '{}.h5'.format(step))
         net_utils.save_net(j, exp_name, step + 1, lr, save_name, net)
         print(('save model: {}'.format(save_name)))
 
+        # clean old checkpoints
         if step % 10 == 1:
             cfg.clean_ckpts(train_output_dir)
 
+        # counter reset
         step_cnt = 0
