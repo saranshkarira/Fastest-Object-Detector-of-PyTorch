@@ -1,45 +1,54 @@
-# DataSet Barebone
+"""
+This file contains following:
+
+- Custom Dataset class for loading LMDB
+- Data augmentation for both images as well as bounding box
+- Eval Code
+
+"""
+
+import os
+import sys
+import threading
+import time
+
 
 import torch.utils.data as data
-
 import numpy as np
-
 import cv2
 
 import json
 import lmdb
-
-# from utils.im_transform put your transforms here
-import threading
-
-import sys
-from cfgs import config as cfg
-import time
-import os
-from eval_voc import voc_eval
 import pickle
+
+from cfgs import config as cfg
+from eval_voc import voc_eval
 
 
 class dataset(data.Dataset):
     def __init__(self, target_file, root_dir, multiscale, train=True):  # , transforms=True):
         """
         Args:
-            target_file (string): Path to the target file with annotations.
-            root_dir (string): Directory with all the images.
-            transform (callable, optional): Optional transform to be applied
-                on a sample.
+            target_file (string)    :       Path to the target file with annotations.
+            root_dir (string)       :       Directory with all the images.
+            multiscale              :       Selected scale for images
+            train                   :       True if training, off if eval
         """
-        self.crop = 320
+        self.crop = 320  # Random crop
         self.root_dir = root_dir
         self.train = train
         self.eval_name = str(time.time()) + '{}.txt'
-        self.year = 2007  # eval metric
+        self.year = 2007  # VOC eval metric
 
+        # creating lmdb environment
         self.env = lmdb.open(root_dir, max_readers=5, readonly=True, lock=False, readahead=False, meminit=False)
-        self.txn = self.env.begin(write=False)
-        self.length = self.txn.stat()['entries'] - 4  # for mapping
 
-        classes = None
+        # opening a transaction without context manager as it gets destroyed with the object after each mini-batch
+        # This is to prevent txn overhead
+        self.txn = self.env.begin(write=False)
+        self.length = self.txn.stat()['entries']  # for mapping
+
+        classes = None  # put VOC instead
         if classes is None:
             self.classes = {'Weapon', 'Vehicle', 'Building', 'People'}
         else:
@@ -47,17 +56,14 @@ class dataset(data.Dataset):
 
         self.class_map = {'Weapon': [0], 'Vehicle': [1], 'Building': [2], 'People': [3]}
 
+        # Target file is in json
         with open(target_file) as opener:
             self.targets = json.load(opener)
 
         self.dst_size = multiscale
-        # self.sample = {'image': [], 'gt_boxes': [], 'gt_classes': [], 'dontcare': []}
-    # len
 
     def __len__(self):
-
         return self.length
-    # getitem
 
     def __getitem__(self, idx):
         return idx
@@ -109,6 +115,7 @@ class dataset(data.Dataset):
     #     print(im.shape)
     #     return gt_boxes, im
 
+    # scale image by aspect ratio into the given scale size
     def multiscale(self, inp_size, gt_boxes, im):
 
         if inp_size is not None:
@@ -133,6 +140,7 @@ class dataset(data.Dataset):
             # print(im.shape)
         return gt_boxes, im
 
+    # randomly flip an image and boxes horizontally with 0.5 probablity
     def flip(self, im, boxes):
         if len(boxes) == 0:
             return boxes
@@ -148,6 +156,7 @@ class dataset(data.Dataset):
 
         return im, boxes
 
+    # random crops
     def random_crop(self, output_size, im, gt_boxes):
         """Crop randomly the image in a sample.
 
@@ -173,13 +182,12 @@ class dataset(data.Dataset):
             left = 0
 
         im = im[top: top + new_h, left: left + new_w]
-        # print(im)
 
         gt_boxes = gt_boxes - [left, top, left, top]
-        # print(im.shape)
 
         return im, gt_boxes
 
+    # parses json structure into more accessible format
     def get_annots(self, index):
         gt_boxes = []
         gt_classes = []
@@ -203,6 +211,7 @@ class dataset(data.Dataset):
 
         return image_id, gt_boxes, gt_classes
 
+    # get the image from lmdb and call all the above transformations in most efficient order
     def preprocess_train(self, index, size_index, multi_scale_inp_size):
 
         inp_size = multi_scale_inp_size[size_index]
@@ -236,6 +245,7 @@ class dataset(data.Dataset):
 
         return im, gt_boxes, gt_classes, [], ori_im
 
+    # pass the index, get transformed image, gtruth and classes, put them as a list/mini-batch
     def fetch_batch(self, ith, index, size_index, dst_size):
         images, gt_boxes, classes, dontcare, origin_im = self.preprocess_train(index, size_index, dst_size)
         # print(ith)
@@ -257,6 +267,7 @@ class dataset(data.Dataset):
     #             'gt_classes': torch.Tensor(sample['gt_classes']),
     #             'dontcare': torch.from_numpy(np.asarray(sample['dontcare']))}
 
+    # runs multiple threads and gets the transformed image and bbox for index
     def fetch_parse(self, index, size_index):
         index = index.numpy()
         lenindex = len(index)
