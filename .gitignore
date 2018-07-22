@@ -2,4 +2,4 @@ db/
 models/
 darknet.pyc dataset.pyc eval_voc.pyc
 darknet.pyc dataset.pyc eval_voc.pyc
-__pycache__
+__pycache__/
