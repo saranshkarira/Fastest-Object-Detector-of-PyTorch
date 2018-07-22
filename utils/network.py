@@ -1,16 +1,14 @@
+"""This file creates three modules conv2d, batchnorm and FC, also contains extra utilities for saving, loading wts, wts initializtion etc"""
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import numpy as np
 
 
-# Creating modules that contains both the gross layer definitions as well as their passes
-# Conv2d is different from nn.Conv2d, using this to our advantage by creating a class with formers name which
-# initializes the latter providing necessary parameters readily available
 class Conv2d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
                  relu=True, same_padding=False):
-        super(Conv2d, self).__init__()  # accessing method from base class
+        super(Conv2d, self).__init__()
         padding = int((kernel_size - 1) / 2) if same_padding else 0
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size,
                               stride, padding=padding)
@@ -21,8 +19,6 @@ class Conv2d(nn.Module):
         if self.relu is not None:
             x = self.relu(x)
         return x
-
-# Definition for batch norm enabled convolution module
 
 
 class Conv2d_BatchNorm(nn.Module):
@@ -43,8 +39,6 @@ class Conv2d_BatchNorm(nn.Module):
             x = self.relu(x)
         return x
 
-# Definition for Fully connected module
-
 
 class FC(nn.Module):
     def __init__(self, in_features, out_features, relu=True):
@@ -58,22 +52,23 @@ class FC(nn.Module):
             x = self.relu(x)
         return x
 
-# Non pep8 to import h5py this way
+
+"""Trivial utilities: saving/loading net, loading pretrained wts,
+   converting to and from torch variables, wts initialization,
+   gradients clipping etc"""
 
 
 def save_net(counter, exp_name, epoch, lr, fname, net):
-    import h5py  # Opening file in write mode/Creating one
+    import h5py
     h5f = h5py.File(fname, mode='w')
     h5f.create_dataset('exp_params', data=np.array([counter, exp_name, epoch, lr]))
     for k, v in list(net.state_dict().items()):
-        h5f.create_dataset(k, data=v.cpu().numpy())  # writing dataset with k as keyname and v after converting
-        # it to cpu and numpy array
+        h5f.create_dataset(k, data=v.cpu().numpy())
 
 
 def load_net(fname, net):
     import h5py
-    h5f = h5py.File(fname, mode='r')  # mode 'r' opens the file in read mode
-    # print(str(h5f['exp_name']), 'I am the god of thunder')
+    h5f = h5py.File(fname, mode='r')
     for k, v in list(net.state_dict().items()):
         param = torch.from_numpy(np.asarray(h5f[k]))
         v.copy_(param)
@@ -85,9 +80,6 @@ def load_pretrained_npy(faster_rcnn_model, fname):
     # vgg16
     vgg16_dict = faster_rcnn_model.rpn.features.state_dict()
     for name, val in list(vgg16_dict.items()):
-        # # print name
-        # # print val.size()
-        # # print param.size()
         if name.find('bn.') >= 0:
             continue
         i, j = int(name[4]), int(name[6]) + 1
@@ -142,7 +134,7 @@ def weights_normal_init(model, dev=0.01):
 
 
 def clip_gradient(model, clip_norm):
-    """Computes a gradient clipping coefficient based on gradient norm."""
+    """Computes a gradient clipping coefficient based on gradient norm. Prevents from exploding"""
     totalnorm = 0
     for p in model.parameters():
         if p.requires_grad:
