@@ -7,10 +7,13 @@ import glob
 import json
 
 
+# writes batches of values into lmdb db in intervals
 def write_to_db(env, batch):
     with env.begin(write=True) as txn:
         with txn.cursor() as cursor:
             cursor.putmulti(batch, dupdata=True, overwrite=True, append=False)
+
+# finds all the images mentioned in annotation file that are present in the image folder reads them into binary to write into db
 
 
 def converter(input_path, output_path, target_dir):

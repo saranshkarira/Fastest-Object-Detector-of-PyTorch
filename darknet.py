@@ -1,5 +1,9 @@
-import torch
+"""builds the actual yoloV2 network, converts GTs relative to the grid boxes, provides predictions and losses"""
+from functools import partial
+from multiprocessing import Pool
 import numpy as np
+
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -8,9 +12,6 @@ import cfgs.config as cfg
 from layers.reorg.reorg_layer import ReorgLayer
 from utils.cython_bbox import bbox_ious, anchor_intersections
 from utils.cython_yolo import yolo_to_bbox
-from functools import partial
-
-from multiprocessing import Pool
 
 
 def _make_layers(in_channels, net_cfg):
@@ -41,7 +42,6 @@ def _process_batch(data, size_index):
     W, H = cfg.multi_scale_out_size[size_index]
     inp_size = cfg.multi_scale_inp_size[size_index]
     out_size = cfg.multi_scale_out_size[size_index]
-    ###
     bbox_pred_np, gt_boxes, gt_classes, dontcares, iou_pred_np = data
 
     # net output

@@ -5,6 +5,8 @@ import json
 
 class_map = {'Weapon': [0], 'Vehicle': [1], 'Building': [2], 'Person': [3]}
 
+# given precision and recall, calculates AP in voc syle using  either 07 metric or the new metric
+
 
 def voc_ap(rec, prec, use_07_metric=False):
     """ ap = voc_ap(rec, prec, [use_07_metric])
@@ -38,6 +40,8 @@ def voc_ap(rec, prec, use_07_metric=False):
         # and sum (\Delta recall) * prec
         ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
     return ap
+
+# makes a pickle file from annotation file if not present for faster parsing as eval is needed multiple times, then matches GTs with predictions to calculate precision and recall to calculate AP
 
 
 def voc_eval(detpath, annopath, classname, cachedir, ovthresh=0.5, use_07_metric=False):
