@@ -1,5 +1,11 @@
 db/
 models/
-darknet.pyc dataset.pyc eval_voc.pyc
-darknet.pyc dataset.pyc eval_voc.pyc
+*.pyc
+utils/*.so
+utils/*.c
+*.json
+*.mat
 __pycache__/
+*/__pycache__/
+utils/build/
+
