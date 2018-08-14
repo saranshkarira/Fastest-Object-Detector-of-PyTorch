@@ -50,11 +50,11 @@ class dataset(data.Dataset):
 
         classes = None  # put VOC instead
         if classes is None:
-            self.classes = {'Weapon', 'Vehicle', 'Building', 'People'}
+            self.classes = cfg.classes
         else:
             self.classes = classes
 
-        self.class_map = {'Weapon': [0], 'Vehicle': [1], 'Building': [2], 'People': [3]}
+        self.class_map = cfg.class_map
 
         # Target file is in json
         with open(target_file) as opener:

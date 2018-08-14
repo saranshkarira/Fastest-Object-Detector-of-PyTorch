@@ -1,5 +1,5 @@
 import os
-from .config_vmr import *  # noqa
+from .config_voc import *  # noqa
 from .exps.darknet19_exp1 import *  # noqa
 import glob
 

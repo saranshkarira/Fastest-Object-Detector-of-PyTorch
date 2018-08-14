@@ -20,6 +20,7 @@ import utils.network as net_utils  # THEY HAVE ALTERNATES
 from darknet import Darknet19 as Darknet
 from utils.timer import Timer
 from dataset import dataset as dset
+from loss import loss
 
 
 # Parse the Arguments
@@ -67,7 +68,7 @@ if __name__ == '__main__':
         data_loader = torch.utils.data.DataLoader(image_data, batch_size=args.batch, shuffle=True, num_workers=args.workers, multiscale=cfg.multi_scale_inp_size)
 
     # replace 4 with the number of classes in your custom dataset
-    classes = 20 if args.transfer else 4
+    classes = 20 if args.transfer else cfg.num_classes
 
     # create the network
     net = Darknet(classes)
@@ -123,14 +124,14 @@ if __name__ == '__main__':
     # Optimizer only optimizes 5th conv layer
     optimizable = net.conv5.parameters  # this is always the case whether transfer or not
 
-    # net.cuda()
+    net.cuda()
     # net = torch.nn.DataParallel(net)
     # device = torch.device("cuda:0")
     # net.to(device)
-    # net = torch.nn.DataParallel(net, device_ids=list(range(torch.cuda.device_count())))
+    net = torch.nn.DataParallel(net, device_ids=list(range(torch.cuda.device_count())))
 
     # Load the model on gpu
-    net.cuda()
+    # net.cuda()
 
     # SGD optimizer
     optimizer = torch.optim.SGD(optimizable(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
@@ -169,17 +170,17 @@ if __name__ == '__main__':
             origin_im = ['origin_im']
 
             # sending images onto gpu after turning them into torch variable
-            im = net_utils.np_to_variable(im,
-                                          is_cuda=True,
-                                          volatile=False).permute(0, 3, 1, 2)
+            im = net_utils.np_to_variable(im, is_cuda=True, volatile=False).permute(0, 3, 1, 2)
 
-            bbox_pred, iou_pred, prob_pred = net(im, gt_boxes, gt_classes, dontcare, size_index)
+            bbox_pred, iou_pred, prob_pred = net(im)
+
+            bbox_loss_i, iou_loss_i, cls_loss_i = loss(gt_boxes, gt_classes, dontcare, size_index, bbox_pred, iou_pred, prob_pred)
 
             # accumulating mini-batch loss
-            loss = net.loss
-            bbox_loss += net.bbox_loss.data.cpu().numpy()[0]
-            iou_loss += net.iou_loss.data.cpu().numpy()[0]
-            cls_loss += net.cls_loss.data.cpu().numpy()[0]
+            loss = bbox_loss_i + iou_loss_i + cls_loss_i
+            bbox_loss += bbox_loss_i.data.cpu().numpy()[0]
+            iou_loss += iou_loss_i.data.cpu().numpy()[0]
+            cls_loss += cls_loss_i.data.cpu().numpy()[0]
             train_loss += loss.data.cpu().numpy()[0]
 
             # clearing grads before calculating new ones and then updating wts
