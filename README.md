@@ -11,7 +11,7 @@
 
 - Well, at my place, I have very limited resources and unaffordable clouds due to currency conversion, time is a very precious commodity.
 
-- All I could get my hands on was a K80 with time restrictions per day, so I made this API keeping those things in mind(i.e. consistency in Pause/Play to train it over multiple days, train it in as less time as possible etc). 
+- All I could get my hands on was a K40 with time restrictions per day, so I made this API keeping those things in mind(i.e. consistency in Pause/Play to train it over multiple days, train it in as less time as possible etc). 
 
 - Since then, I've learned and implemented a lot more techniques in other projects that can make this API even faster 
 unfortunately I really don't have time and resources to integrate them into this one.
@@ -57,7 +57,9 @@ unfortunately I really don't have time and resources to integrate them into this
   ```bash
   https://github.com/saranshkarira/pytorch-yolov2-fastest.git
   ```
-
+- Open ```make.sh```
+```nano make.sh```
+- Replace sm_35 @ -arch=sm_35 to the sm of your own GPU ([`Refer`](http://arnon.dk/matching-sm-architectures-arch-and-gencode-for-various-nvidia-cards/))
 - Build the reorg layer ([`tf.extract_image_patches`](https://www.tensorflow.org/api_docs/python/tf/extract_image_patches))
   ```bash
   cd pytorch-yolov2-fastest
@@ -90,6 +92,9 @@ This step will pack your image dataset into a nice LMDB database file.
 7. Now, for the final step, open ```.cfgs/config_voc.py``` and replace *VOC* classes with your custom classes.
 
 ### Training:
+- To adjust your hyper-parameters, refer to this file:
+```.cfgs/exps/darknet19_exp1.py```
+
 Now, once everything is setup, you can train the model by:
 1. If it's the first time, you'll need to activate *Transfer Learning*, and the model will be loaded from the pretrained model.
 ```bash
@@ -109,6 +114,25 @@ Run
   ```
 ### Results:
 This is a trainer API, after the training is complete, you can use the .h5 file in various available YOLOv2 detection APIs and it will work all the same, especially longcw's or you can contribute or wait until a detection pipeline is made as well.
+
+
+## Navigating the API
+*For contributors only*
+I believe, a good navigation goes a long way and speeds up the development process of a project.
+The API is structured in the following way:
+
+1. All the configuration files are in ```cfg/``` directory, general functions and settings(directory locations) are saved in ```config.py```, Dataset specific settings(Anchors, class_names) are saved in ```config_voc.py```, Experiment specific settings(hyper-parameters) are saved in ```exps/```
+
+2. ```layer/``` contains custom modules written in cython that are compiled using make.sh script.
+3. ```mat_to_json``` contains script to convert and export .mat annotation file into json.
+4. ```db/``` contains 3 folders, ```raw```, ```image_data``` and ```targets```, for raw images, lmdb data and annotations respectively, basically all the dataset related stuff.
+5. ```models``` contains model related stuff, training checkpoints, pretrained model and Tensorboard logs.
+6. ```utils``` contains misc functions such as NMS, converting annotations to grid respective, saving and loading weights.
+7. cursor_putting.py converts raw_images into lmdb database.
+8. dataset.py is a custom pytorch dataset class with custom collate function. Also some eval code.
+9. darknet.py has the model definition.
+10. loss.py calculates the loss.
+11. trainer.py is the main/central file that uses all the above files and trains the model.
 
 ## TO-DO:
 - [x] Implementing LMDB in an efficient way.
