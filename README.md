@@ -78,15 +78,16 @@ unfortunately I really don't have time and resources to integrate them into this
 
 ### Preparing the dataset:
 This step will pack your image dataset into a nice LMDB database file.
-1. Put all the images in ./db/raw/
+1. Put all the images in ```./db/raw/```
 2. There might be some images in the dataset that you did not annotate because object was vague or simply not there.
-3. Don't worry, put the annotation file(JSON) in ./db/targets and now it will only pack images that you annotated.
+3. Don't worry, put the annotation file(JSON) in ```./db/targets``` and now it will only pack images that you annotated.
 4. You can get away with keeping the targets folder empty, in which case it will pack all the images in raw folder but you'll have to put JSON in targets anyway so I'd say do this before.
 5. Run 
     ```bash
     python2.7 cursor_putting.py
     ```
-6. LMDB files will be generated in .db/image_data/ directory.
+6. LMDB files will be generated in ```.db/image_data/``` directory.
+7. Now, for the final step, open ```.cfgs/config_voc.py``` and replace *VOC* classes with your custom classes.
 
 ### Training:
 Now, once everything is setup, you can train the model by:
@@ -106,11 +107,10 @@ Run
   ```bash
   tensorboard --logdir .models/logs
   ```
+### Results:
+This is a trainer API, after the training is complete, you can use the .h5 file in various available YOLOv2 detection APIs and it will work all the same, especially longcw's or you can contribute or wait until a detection pipeline is made as well.
 
-## Current bug: 
-The object detector produces different number of boxes for different images due to this the mini-batch is made from custom collate function which is a list of torch tensors of different dimensions, this works fluently on single GPU but when it's loaded on multi-gpu using DataParallel class, the passed list to Darknet class(inherited from nn.Module) is actually being passed as None inside the class
-
-## ToDo:
+## TO-DO:
 - [x] Implementing LMDB in an efficient way.
 - [x] Matlab Script to export annotations into JSON
 - [x] Custom Dataset in Pytorch(including custom collate fxn)
@@ -123,6 +123,7 @@ The object detector produces different number of boxes for different images due 
 - [x] Only maintaining 'n' no of checkpoints
 - [x] Transfer Learning
 - [x] Eval Code
+- [x] DataParallel Issue
 - [ ] Detection Pipeline using OpenCV
 - [ ] Support for PyTorch 0.4
 - [ ] A port to Python3
