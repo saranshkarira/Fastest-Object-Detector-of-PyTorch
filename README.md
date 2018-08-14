@@ -16,7 +16,7 @@ unfortunately I really don't have time and resources to integrate them into this
 Use this API if you want to make your own dataset and train the pretrained YOLOv2 over it.
 
 ### Speed and Accuracy:
-The basic functions of the code were inspired from https://github.com/longcw/yolo2-pytorch which is still an experimental project and wasn't achieving mAP as per the orignal YOLOv2 implementation, yet I found it impressive that the postprocessing functions and custom modules were implemented in Cython, using them certainly gave a headstart, plus I improved it even more so now this API is 700% faster than that implementation and is as accurate as the orignal implementation.
+The basic functions of the code were inspired from https://github.com/longcw/yolo2-pytorch which is still an experimental project and wasn't achieving mAP as per the orignal YOLOv2 implementation, yet I found it impressive that the postprocessing functions and custom modules were implemented in Cython, using them certainly gave a headstart, plus I improved it even more so now this API is 700% faster than longcw's and is as accurate as the orignal implementation.
 
 ### LMDB Support: 
 - The LMDB database offers the fastest read speeds, is memory-mapped and corruption proof.
@@ -44,23 +44,23 @@ The basic functions of the code were inspired from https://github.com/longcw/yol
 The object detector produces different number of boxes for different images due to this the mini-batch is made from custom collate function which is a list of torch tensors of different dimensions, this works fluently on single GPU but when it's loaded on multi-gpu using DataParallel class, the passed list to Darknet class(inherited from nn.Module) is actually being passed as None inside the class
 
 ## ToDo:
-[x] Implementing LMDB in an efficient way.
-[x] Matlab Script to export annotations into JSON
-[x] Custom Dataset in Pytorch(including custom collate fxn)
-[x] Multithreading
-[x] Applying transfomations to Image as well as Annotations
-[x] Training Regime
-[x] Speeding up Training Regime
-[x] TensorBoard
-[x] Adding log,load and save consistency over multiple pause and plays.
-[x] Only maintaining 'n' no of checkpoints
-[x] Eval Code
-[ ] Detection Pipeline using OpenCV
-[ ] Support for PyTorch 0.4
-[ ] A port to Python3
-[ ] Add a parser function so that it can parse different flavors of YOLO using cfg files
-[ ] Add a subparser function so the base DarkNet can be replaced with other classification nets such as MobileNets, Squeezenets etc.
-[ ] Replace SGD with AdamW so the training speed increases even more
-[ ] Add support for standard datasets such as COCO and VOC
-[ ] Add options for several pruning methods.
+- [x] Implementing LMDB in an efficient way.
+- [x] Matlab Script to export annotations into JSON
+- [x] Custom Dataset in Pytorch(including custom collate fxn)
+- [x] Multithreading
+- [x] Applying transfomations to Image as well as Annotations
+- [x] Training Regime
+- [x] Speeding up Training Regime
+- [x] TensorBoard
+- [x] Adding log,load and save consistency over multiple pause and plays.
+- [x] Only maintaining 'n' no of checkpoints
+- [x] Eval Code
+- [ ] Detection Pipeline using OpenCV
+- [ ] Support for PyTorch 0.4
+- [ ] A port to Python3
+- [ ] Add a parser function so that it can parse different flavors of YOLO using cfg files
+- [ ] Add a subparser function so the base DarkNet can be replaced with other classification nets such as MobileNets, Squeezenets etc.
+- [ ] Replace SGD with AdamW so the training speed increases even more
+- [ ] Add support for standard datasets such as COCO and VOC
+- [ ] Add options for several pruning methods.
 
