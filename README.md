@@ -1,36 +1,46 @@
 # Fastest Object Detection on PyTorch
-This YOLOv2 based API is a fast(fastest?), consistent and robust solution to train your own object detector with your own custom dataset from scratch including annotating part.
+- This YOLOv2 based API is a robust, consistent and fastest solution to train your own object detector with your own custom dataset from scratch including annotating the data.
+- Also it delivers the fastest train and detect time speeds for PyTorch as well.
+- Use this API if you want to train your object detector on your own custom data and classes from ground up.
 
-**NOTE** : While the basic underlying API is made robust and complete, there are couple more lines of development that can be pursued with sure success which will make it even more faster, lighter and better.
-I'm currently indulged in research so further development will be slower but in case you're interested in developing this project, you're welcome to contact me to discuss these lines of development.
+**NOTE** : 
+
+- I'm currently indulged in other activity so further development will be slower but in case you're interested in contributing to this project, you're welcome to contact me to discuss future lines of development.
 
 ## Why this API?
-The API in its current state is only fast in terms of training, not detection, so why use it at all? Or a better question, why make it at all?
-Well, being a part of a third-world country with limited resources and unaffordable clouds due to currency conversion, time is a very precious commodity, 
-all I could get my hands on were a couple of K80s with time restrictions, so I made this API keeping those things in mind. Since then, I've learned and implemented a lot more techniques in other projects that can make this API even faster 
+
+- Well, at my place, I have very limited resources and unaffordable clouds due to currency conversion, time is a very precious commodity.
+
+- All I could get my hands on was a K80 with time restrictions per day, so I made this API keeping those things in mind(i.e. consistency in Pause/Play to train it over multiple days, train it in as less time as possible etc). 
+
+- Since then, I've learned and implemented a lot more techniques in other projects that can make this API even faster 
 unfortunately I really don't have time and resources to integrate them into this one.
 
-## Features:
+## Features :
 
-### Custom Dataset/Transfer Learning:
-Use this API if you want to make your own dataset and train the pretrained YOLOv2 over it.
+### Custom Dataset/Transfer Learning :
+- Use this API if you want to make your own dataset and train the pretrained YOLOv2 over it.
 
-### Speed and Accuracy:
-The basic functions of the code were inspired from https://github.com/longcw/yolo2-pytorch which is still an experimental project and wasn't achieving mAP as per the orignal YOLOv2 implementation, yet I found it impressive that the postprocessing functions and custom modules were implemented in Cython, using them certainly gave a headstart, plus I improved it even more so now this API is 700% faster than longcw's and is as accurate as the orignal implementation.
+### Speed and Accuracy :
+- The basic functions of the code were inspired from https://github.com/longcw/yolo2-pytorch which is still an experimental project and wasn't achieving mAP as per the orignal YOLOv2 implementation.
+- What I found impressive was that the postprocessing functions and custom modules were implemented in Cython, using them certainly gave a headstart, plus I improved it even more so now this API is 700% faster than longcw's and is as accurate as the orignal implementation.
 
-### LMDB Support: 
+### LMDB Support : 
 - The LMDB database offers the fastest read speeds, is memory-mapped and corruption proof.
 - This is the most efficient way to integrate LMDB with PyTorch that you'll ever find on web (And an even more efficient technique is on it's way :D)
 
-### Matlab ImageLabeller Support:
-- I tried and tested each and every bounding box annotator available out there(For Linux), Matlab's ImageLabeller was hands-down the fastest, most robust tool. Sad that it was usable in Matlab only and had a complex structure efficient to Matlab only, well sad no more. Now you can convert all those annotations altogether into a JSON file in the blink of an eye.
+### Matlab ImageLabeller Support : 
+- I tried and tested each and every bounding box annotator available out there(For Linux), Matlab's ImageLabeller was hands-down the fastest, most robust tool. 
+- Sad that it was usable in Matlab only and had a complex structure efficient to Matlab only.
+- Well sad no more. This API will extract and convert all those annotations into a JSON file in the blink of an eye.
 
-## Tensorboard Support : 
+### Tensorboard Support : 
 - I can't stress this enough, it's extremely weary to stare at terminal or plotting different graphs by the code and maintaining proper consistency, with TensorBoard, never again.
 
-## Ease of Use and Robustness : 
+### Ease of Use and Robustness : 
 - Once setup, the whole training just needs one single command and one optional flag. The API takes care of consistency (whether it's a new experiment or an old one, therefore where to save the TFlogs, checkpoints)
 
+## Requirements :
 - Python2.7
 - Cython 0.27.2
 - OpenCV 3.3
@@ -39,6 +49,63 @@ The basic functions of the code were inspired from https://github.com/longcw/yol
 - LMDB
 - Matlab R2017b 
 - PyTorch 0.3
+
+## How to Use :
+
+### Installation :
+- Clone this repository
+  ```bash
+  https://github.com/saranshkarira/pytorch-yolov2-fastest.git
+  ```
+
+- Build the reorg layer ([`tf.extract_image_patches`](https://www.tensorflow.org/api_docs/python/tf/extract_image_patches))
+  ```bash
+  cd pytorch-yolov2-fastest
+  ./make.sh
+  ```
+- Make models and db directory
+  ```bash
+  mkdir -p models db
+  ```
+- Download the trained model [yolo-voc.weights.h5](https://drive.google.com/open?id=0B4pXCfnYmG1WUUdtRHNnLWdaMEU) and put it in the models/ directory.
+
+### Annotation :
+1. Annotate Images using the Matlab ImageLabeller Tool.
+2. Export the session as .mat file.
+3. You can scale this to multiple people on multiple machines for a larger dataset, then export all these sessions as .mat file.
+4. Put all these files in mat_to_json folder and run the encoder.m script.
+5. You will have a single, nice and lightweight JSON file containing all the annotations.
+
+### Preparing the dataset:
+This step will pack your image dataset into a nice LMDB database file.
+1. Put all the images in ./db/raw/
+2. There might be some images in the dataset that you did not annotate because object was vague or simply not there.
+3. Don't worry, put the annotation file(JSON) in ./db/targets and now it will only pack images that you annotated.
+4. You can get away with keeping the targets folder empty, in which case it will pack all the images in raw folder but you'll have to put JSON in targets anyway so I'd say do this before.
+5. Run 
+    ```bash
+    python2.7 cursor_putting.py
+    ```
+6. LMDB files will be generated in .db/image_data/ directory.
+
+### Training:
+Now, once everything is setup, you can train the model by:
+1. If it's the first time, you'll need to activate *Transfer Learning*, and the model will be loaded from the pretrained model.
+```bash
+   python2.7 trainer.py -tl True
+```
+2. Now everytime after that, when you stop the training and want to resume it from the latest checkpoint.
+```bash
+   python2.7 trainer.py
+```
+
+**Note** : No need to worry about number of checkpoints, after every few epochs, old ones will be pruned.
+
+### Tensorboard:
+Run
+  ```bash
+  tensorboard --logdir .models/logs
+  ```
 
 ## Current bug: 
 The object detector produces different number of boxes for different images due to this the mini-batch is made from custom collate function which is a list of torch tensors of different dimensions, this works fluently on single GPU but when it's loaded on multi-gpu using DataParallel class, the passed list to Darknet class(inherited from nn.Module) is actually being passed as None inside the class
