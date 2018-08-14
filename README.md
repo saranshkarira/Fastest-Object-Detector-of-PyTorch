@@ -121,6 +121,7 @@ The object detector produces different number of boxes for different images due 
 - [x] TensorBoard
 - [x] Adding log,load and save consistency over multiple pause and plays.
 - [x] Only maintaining 'n' no of checkpoints
+- [x] Transfer Learning
 - [x] Eval Code
 - [ ] Detection Pipeline using OpenCV
 - [ ] Support for PyTorch 0.4
