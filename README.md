@@ -7,6 +7,30 @@
 
 - I'm currently indulged in other activity so further development will be slower but in case you're interested in contributing to this project, you're welcome to contact me to discuss future lines of development.
 
+## TO-DO:
+- [x] Implementing LMDB in an efficient way.
+- [x] Matlab Script to export annotations into JSON
+- [x] Custom Dataset in Pytorch(including custom collate fxn)
+- [x] Multithreading
+- [x] Applying transfomations to Image as well as Annotations
+- [x] Training Regime
+- [x] Speeding up Training Regime
+- [x] TensorBoard
+- [x] Adding log,load and save consistency over multiple pause and plays.
+- [x] Only maintaining 'n' no of checkpoints
+- [x] Transfer Learning
+- [x] Eval Code
+- [x] DataParallel Issue
+- [ ] Detection Pipeline using OpenCV
+- [ ] Support for PyTorch 0.4
+- [ ] A port to Python3
+- [ ] Add a parser function so that it can parse different flavors of YOLO using cfg files
+- [ ] Add a subparser function so the base DarkNet can be replaced with other classification nets such as MobileNets, Squeezenets etc.
+- [ ] Replace SGD with AdamW so the training speed increases even more
+- [ ] Add support for standard datasets such as COCO and VOC
+- [ ] Add options for several pruning methods.
+
+
 ## Why this API?
 
 - Well, at my place, I have very limited resources and unaffordable clouds due to currency conversion, time is a very precious commodity.
@@ -133,27 +157,3 @@ The API is structured in the following way:
 9. darknet.py has the model definition.
 10. loss.py calculates the loss.
 11. trainer.py is the main/central file that uses all the above files and trains the model.
-
-## TO-DO:
-- [x] Implementing LMDB in an efficient way.
-- [x] Matlab Script to export annotations into JSON
-- [x] Custom Dataset in Pytorch(including custom collate fxn)
-- [x] Multithreading
-- [x] Applying transfomations to Image as well as Annotations
-- [x] Training Regime
-- [x] Speeding up Training Regime
-- [x] TensorBoard
-- [x] Adding log,load and save consistency over multiple pause and plays.
-- [x] Only maintaining 'n' no of checkpoints
-- [x] Transfer Learning
-- [x] Eval Code
-- [x] DataParallel Issue
-- [ ] Detection Pipeline using OpenCV
-- [ ] Support for PyTorch 0.4
-- [ ] A port to Python3
-- [ ] Add a parser function so that it can parse different flavors of YOLO using cfg files
-- [ ] Add a subparser function so the base DarkNet can be replaced with other classification nets such as MobileNets, Squeezenets etc.
-- [ ] Replace SGD with AdamW so the training speed increases even more
-- [ ] Add support for standard datasets such as COCO and VOC
-- [ ] Add options for several pruning methods.
-
