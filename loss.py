@@ -37,11 +37,11 @@ def loss_fxn(gt_boxes, gt_classes, dontcare, size_index, bbox_pred, iou_pred, pr
     # _boxes[:, :, :, 2:4] = torch.log(_boxes[:, :, :, 2:4])
     box_mask = box_mask.expand_as(_boxes)
 
-    bbox_loss = nn.MSELoss(size_average=False)(bbox_pred * box_mask, _boxes * box_mask) / num_boxes  # noqa
-    iou_loss = nn.MSELoss(size_average=False)(iou_pred * iou_mask, _ious * iou_mask) / num_boxes  # noqa
+    bbox_loss = nn.L1Loss(size_average=False)(bbox_pred * box_mask, _boxes * box_mask) / num_boxes  # noqa
+    iou_loss = nn.L1Loss(size_average=False)(iou_pred * iou_mask, _ious * iou_mask) / num_boxes  # noqa
 
     class_mask = class_mask.expand_as(prob_pred)
-    cls_loss = nn.MSELoss(size_average=False)(prob_pred * class_mask, _classes * class_mask) / num_boxes  # noqa
+    cls_loss = nn.CrossEntropyLoss(size_average=False)(prob_pred * class_mask, _classes * class_mask) / num_boxes  # noqa #Wrong, Cross entropy loss
 
     return bbox_loss, iou_loss, cls_loss
 
