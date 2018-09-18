@@ -13,6 +13,7 @@ New version to be released on 25th Sept'18
 - Freezeout
 - Snapshot Ensemble
 - Ability to add custom classification nets as network backbone from cfg files
+- Half Precision Support
 
 ## TO-DO:
 - [x] Implementing LMDB in an efficient way.
