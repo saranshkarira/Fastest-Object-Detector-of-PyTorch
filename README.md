@@ -5,7 +5,14 @@
 
 **NOTE** : 
 
-- I'm currently indulged in other activity so further development will be slower but in case you're interested in contributing to this project, you're welcome to contact me to discuss future lines of development.
+New version to be released on 25th Sept'18
+
+**[Additions]** : 
+- Pytorch 0.4
+- Improved LMDB DataLoading Algo
+- Freezeout
+- Snapshot Ensemble
+- Ability to add custom classification nets as network backbone from cfg files
 
 ## TO-DO:
 - [x] Implementing LMDB in an efficient way.
