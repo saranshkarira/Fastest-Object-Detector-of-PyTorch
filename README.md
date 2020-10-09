@@ -1,11 +1,12 @@
-# Fastest Object Detection on PyTorch
+# Ex-Fastest Object Detection on PyTorch
+
 - This YOLOv2 based API is a robust, consistent and fastest solution to train your own object detector with your own custom dataset from scratch including annotating the data.
 - Also it delivers the fastest train and detect time speeds for PyTorch as well.
 - Use this API if you want to train your object detector on your own custom data and classes from ground up.
 
 **NOTE** : 
+This repo was a port of YOLOv2 on Pytorch with some further additions, however with newer versions of YOLO available and v5 being directly available on PyTorch, this repo is no longer maintained.
 
-New version to be released on 25th Sept'18
 
 **[Additions]** : 
 - Pytorch 0.4
